@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Upload, X, File, Send, Users, AlertCircle } from 'lucide-react';
@@ -6,27 +6,34 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface FileTransferProps {
   selectedDevices: string[];
+  onDevicesUpdate?: (devices: Device[]) => void;
 }
 
-export function FileTransfer({ selectedDevices }: FileTransferProps) {
+export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Mock device names per gli ID selezionati
-  const deviceNames: Record<string, string> = {
-    '1': 'iPhone di Marco',
-    '2': 'MacBook Pro',
-    '3': 'PC Desktop Gaming',
-    '4': 'Samsung Galaxy S23'
-  };
+  const [deviceNames, setDeviceNames] = useState<Record<string, string>>({});
+  // Aggiorna deviceNames quando onDevicesUpdate viene chiamato dal componente padre
+  useEffect(() => {
+    if (!onDevicesUpdate) return;
+    const updateNames = (devices: Device[]) => {
+      const names: Record<string, string> = {};
+      devices.forEach(device => {
+        names[device.id] = device.name;
+      });
+      setDeviceNames(names);
+    };
+    onDevicesUpdate(updateNames);
+  }, [onDevicesUpdate]);
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       setSelectedFile(files[0]);
@@ -52,10 +59,10 @@ export function FileTransfer({ selectedDevices }: FileTransferProps) {
 
   const handleSend = async () => {
     if (!selectedFile || selectedDevices.length === 0) return;
-    
+
     setIsUploading(true);
     setUploadProgress({});
-    
+
     // Simula invio a ogni dispositivo con progresso individuale
     for (const deviceId of selectedDevices) {
       // Simula progresso di upload per ogni dispositivo
@@ -67,14 +74,14 @@ export function FileTransfer({ selectedDevices }: FileTransferProps) {
         }));
       }
     }
-    
+
     // Aspetta un po' prima di completare
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     setIsUploading(false);
     setSelectedFile(null);
     setUploadProgress({});
-    
+
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -120,7 +127,7 @@ export function FileTransfer({ selectedDevices }: FileTransferProps) {
           <div className="space-y-2">
             {selectedDevices.map(deviceId => (
               <div key={deviceId} className="flex items-center justify-between text-sm">
-                <span className="text-gray-300">{deviceNames[deviceId] || `Dispositivo ${deviceId}`}</span>
+                <span className="text-gray-300">{deviceNames[deviceId] ? deviceNames[deviceId] : deviceId}</span>
                 {isUploading && uploadProgress[deviceId] !== undefined && (
                   <div className="flex items-center gap-2">
                     <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">

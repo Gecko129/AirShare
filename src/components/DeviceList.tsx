@@ -3,6 +3,7 @@ import { Badge } from './ui/badge';
 import { Card } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Wifi, Smartphone, Laptop, Monitor, Router, Zap } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 
 interface Device {
   id: string;
@@ -22,152 +23,134 @@ interface DeviceListProps {
   onSelectionChange: (deviceIds: string[]) => void;
 }
 
-// Mock data per simulare dispositivi con AirShare attivo
-const initialDevices: Device[] = [
-  { 
-    id: '1', 
-    name: 'iPhone di Marco', 
-    ip: '192.168.1.101', 
-    mac: '00:1B:44:11:3A:B7', 
-    type: 'phone', 
-    status: 'online', 
-    airshareActive: true,
-    lastSeen: 'ora',
-    version: '2.1.0',
-    stability: 0.95
-  },
-  { 
-    id: '2', 
-    name: 'MacBook Pro', 
-    ip: '192.168.1.102', 
-    mac: '00:1B:44:11:3A:B8', 
-    type: 'laptop', 
-    status: 'online', 
-    airshareActive: true,
-    lastSeen: 'ora',
-    version: '2.1.0',
-    stability: 0.98
-  },
-  { 
-    id: '3', 
-    name: 'PC Desktop Gaming', 
-    ip: '192.168.1.103', 
-    mac: '00:1B:44:11:3A:C0', 
-    type: 'desktop', 
-    status: 'online', 
-    airshareActive: true,
-    lastSeen: 'ora',
-    version: '2.0.5',
-    stability: 0.92
-  },
-  { 
-    id: '4', 
-    name: 'Samsung Galaxy S23', 
-    ip: '192.168.1.104', 
-    mac: '00:1B:44:11:3A:C1', 
-    type: 'phone', 
-    status: 'online', 
-    airshareActive: true,
-    lastSeen: '30 sec fa',
-    version: '2.1.0',
-    stability: 0.90
-  },
-];
-
 const getDeviceIcon = (type: Device['type']) => {
   switch (type) {
-    case 'phone': 
+    case 'phone':
       return <Smartphone className="w-5 h-5 text-gray-300" />;
-    case 'laptop': 
+    case 'laptop':
       return <Laptop className="w-5 h-5 text-gray-300" />;
-    case 'desktop': 
+    case 'desktop':
       return <Monitor className="w-5 h-5 text-gray-300" />;
-    case 'router': 
+    case 'router':
       return <Router className="w-5 h-5 text-gray-300" />;
-    default: 
+    default:
       return <Wifi className="w-5 h-5 text-gray-300" />;
   }
 };
 
+const guessDeviceType = (name: string): Device['type'] => {
+  const lowerName = name.toLowerCase();
+
+  if (lowerName.includes('ipad') || lowerName.includes('iphone') || lowerName.includes('android')) {
+    return 'phone';
+  }
+  if (lowerName.includes('macbook') || lowerName.includes('laptop') || lowerName.includes('dell')) {
+    return 'laptop';
+  }
+  if (lowerName.includes('imac') || lowerName.includes('desktop') || lowerName.includes('pc')) {
+    return 'desktop';
+  }
+  if (lowerName.includes('router') || lowerName.includes('gateway')) {
+    return 'router';
+  }
+
+  return 'other';
+};
+
 export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListProps) {
-  const [devices, setDevices] = useState<Device[]>(initialDevices);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
+
+  // Funzione che chiama il backend Rust tramite Tauri per ottenere la lista dispositivi
+  useEffect(() => {
+    console.log('Tauri API disponibile:', window.__TAURI__);
+    console.log('Versione Tauri:', window.__TAURI_METADATA__);
+    console.log('Invoke disponibile:', typeof invoke);
+
+    async function fetchDevices() {
+      try {
+        const devs = await invoke<Device[]>('get_devices');
+        console.log('[DeviceList] Dati grezzi dal backend:', devs);
+
+        const mappedDevices = devs.map(d => ({
+          id: d.id || d.ip,
+          name: d.name || 'Dispositivo sconosciuto',
+          ip: d.ip,
+          mac: d.mac || '00:00:00:00:00:00',
+          type: guessDeviceType(d.name) || d.type || 'other',
+          status: 'online' as const, // Forza online per ora
+          airshareActive: true, // Forza true per ora
+          lastSeen: d.lastSeen || 'ora',
+          version: d.version || '1.0.0',
+          stability: d.stability !== undefined ? d.stability : 1,
+        }));
+
+        console.log(`[DeviceList] Dispositivi dopo mapping (${mappedDevices.length}):`, mappedDevices);
+        mappedDevices.forEach((device, index) => {
+          console.log(`Dispositivo ${index}:`, {
+            name: device.name,
+            status: device.status,
+            airshareActive: device.airshareActive,
+            type: device.type
+          });
+        });
+
+        setDevices(mappedDevices);
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error('[DeviceList] Errore fetch dispositivi:', error.message, error.stack);
+        } else {
+          console.error('[DeviceList] Errore fetch dispositivi:', error);
+        }
+      }
+    }
+
+    fetchDevices();
+    const interval = setInterval(fetchDevices, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Calcola il padding dinamico in base alla lunghezza del nome più lungo
   const dynamicLayout = useMemo(() => {
-    const airshareDevices = devices.filter(device => device.airshareActive && device.status === 'online');
-    
+    // Mostra TUTTI i dispositivi per ora
+    const airshareDevices = devices;
+
     if (airshareDevices.length === 0) return { containerPadding: 'px-8', itemSpacing: 'gap-8' };
-    
+
     const maxNameLength = Math.max(...airshareDevices.map(device => device.name.length));
-    
-    // Calcolazioni dinamiche basate sulla lunghezza dei nomi
+
     if (maxNameLength > 20) {
-      return { 
-        containerPadding: 'px-10', 
+      return {
+        containerPadding: 'px-10',
         itemSpacing: 'gap-10',
         nameContainer: 'min-w-[280px]'
       };
     } else if (maxNameLength > 15) {
-      return { 
-        containerPadding: 'px-9', 
+      return {
+        containerPadding: 'px-9',
         itemSpacing: 'gap-9',
         nameContainer: 'min-w-[240px]'
       };
     } else {
-      return { 
-        containerPadding: 'px-8', 
+      return {
+        containerPadding: 'px-8',
         itemSpacing: 'gap-8',
         nameContainer: 'min-w-[200px]'
       };
     }
   }, [devices]);
 
-  // Simula aggiornamenti in tempo reale più stabili
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDevices(prevDevices => {
-        return prevDevices.map(device => {
-          // Usa la stabilità del dispositivo per determinare se rimane online
-          const staysOnline = Math.random() < device.stability;
-          const currentStatus = staysOnline ? 'online' : 'offline';
-          
-          // AirShare rimane attivo se il dispositivo è online
-          const airshareStaysActive = currentStatus === 'online' ? (Math.random() > 0.02) : false;
-          
-          // Aggiorna lastSeen solo se cambiano stati
-          let newLastSeen = device.lastSeen;
-          if (currentStatus === 'online' && device.status === 'offline') {
-            newLastSeen = 'ora';
-          } else if (currentStatus === 'online') {
-            // Aggiorna occasionalmente il tempo per dispositivi online
-            if (Math.random() > 0.8) {
-              const timeOptions = ['ora', '30 sec fa', '1 min fa', '2 min fa'];
-              newLastSeen = timeOptions[Math.floor(Math.random() * timeOptions.length)];
-            }
-          }
+  // Mostra TUTTI i dispositivi per ora (rimuovi il filtro)
+  const airshareDevices = devices;
 
-          return {
-            ...device,
-            status: currentStatus,
-            airshareActive: airshareStaysActive,
-            lastSeen: newLastSeen
-          };
-        });
-      });
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Filtra solo dispositivi con AirShare attivo
-  const airshareDevices = devices.filter(device => device.airshareActive && device.status === 'online');
+  console.log(`[DeviceList] Tutti i dispositivi (${devices.length}):`, devices);
+  console.log(`[DeviceList] Dispositivi da mostrare (${airshareDevices.length}):`, airshareDevices);
 
   const handleDeviceToggle = (deviceId: string, checked: boolean) => {
-    const newSelection = checked 
+    const newSelection = checked
       ? [...selectedDevices, deviceId]
       : selectedDevices.filter(id => id !== deviceId);
-    
+
     onSelectionChange(newSelection);
   };
 
@@ -187,11 +170,11 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
             <Zap className="w-6 h-6 text-gray-200" />
           </div>
           <div>
-            <h2 className="text-gray-100">Dispositivi AirShare</h2>
+            <h2 className="text-gray-100">Dispositivi Rilevati</h2>
             <p className="text-gray-400 text-sm">{airshareDevices.length} dispositivi disponibili</p>
           </div>
         </div>
-        
+
         {airshareDevices.length > 0 && (
           <button
             onClick={handleSelectAll}
@@ -208,8 +191,8 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
           <div className="p-4 rounded-full bg-gray-800/30 w-fit mx-auto mb-4">
             <Zap className="w-8 h-8 text-gray-500" />
           </div>
-          <p className="text-gray-400">Nessun dispositivo AirShare rilevato</p>
-          <p className="text-gray-500 text-sm mt-1">Assicurati che AirShare sia attivo sui dispositivi</p>
+          <p className="text-gray-400">Nessun dispositivo rilevato</p>
+          <p className="text-gray-500 text-sm mt-1">Scansione della rete in corso...</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -218,12 +201,11 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
               key={device.id}
               className={`py-8 ${dynamicLayout.containerPadding} rounded-xl backdrop-blur-sm transition-all duration-300 border min-h-[120px] ${
                 selectedDevices.includes(device.id)
-                  ? 'bg-slate-700/40 border-slate-500/60 shadow-lg shadow-slate-500/10' 
+                  ? 'bg-slate-700/40 border-slate-500/60 shadow-lg shadow-slate-500/10'
                   : 'bg-gray-800/20 border-gray-700/30 hover:bg-gray-800/40'
               }`}
             >
               <div className={`flex items-center ${dynamicLayout.itemSpacing} h-full`}>
-                {/* Checkbox - Allineata al centro */}
                 <div className="flex-shrink-0">
                   <Checkbox
                     checked={selectedDevices.includes(device.id)}
@@ -232,14 +214,12 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
                   />
                 </div>
 
-                {/* Device Icon - Allineata al centro */}
                 <div className={`flex-shrink-0 p-3 rounded-lg ${
                   device.status === 'online' ? 'bg-green-500/20' : 'bg-gray-600/20'
                 }`}>
                   {getDeviceIcon(device.type)}
                 </div>
 
-                {/* Device Info - Centrata verticalmente */}
                 <div className={`flex-1 ${dynamicLayout.nameContainer || 'min-w-0'}`}>
                   <div className="mb-2">
                     <h3 className="text-gray-100 text-base leading-relaxed whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
@@ -249,20 +229,21 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
                   <p className="text-gray-400 text-sm">{device.ip}</p>
                 </div>
 
-                {/* Status and Actions - Allineata al centro */}
                 <div className="flex-shrink-0 flex flex-col items-end gap-3 min-w-[140px]">
-                  {/* Tags aligned vertically */}
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-green-500/20 text-green-200 border-green-500/40 text-xs whitespace-nowrap">
-                      Online
+                    <Badge className={`${
+                      device.status === 'online'
+                        ? 'bg-green-500/20 text-green-200 border-green-500/40'
+                        : 'bg-gray-500/20 text-gray-200 border-gray-500/40'
+                    } text-xs whitespace-nowrap`}>
+                      {device.status === 'online' ? 'Online' : 'Offline'}
                     </Badge>
                     <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/40">
                       <Zap className="w-3 h-3 text-slate-300" />
-                      <span className="text-slate-200 text-xs">AirShare</span>
+                      <span className="text-slate-200 text-xs">Rilevato</span>
                     </div>
                   </div>
-                  
-                  {/* Last seen button */}
+
                   <button
                     onClick={() => setExpandedDevice(expandedDevice === device.id ? null : device.id)}
                     className="text-gray-500 hover:text-gray-300 text-xs transition-colors whitespace-nowrap"
@@ -272,7 +253,7 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
                   </button>
                 </div>
               </div>
-              
+
               {expandedDevice === device.id && (
                 <div className="mt-6 pt-4 border-t border-gray-700/40">
                   <div className="grid grid-cols-2 gap-6 text-sm">
