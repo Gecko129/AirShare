@@ -2,7 +2,7 @@
 
 use std::{
     sync::{Arc, Mutex},
-    net::{UdpSocket, SocketAddr, Ipv4Addr},
+    net::{UdpSocket, SocketAddr},
     time::{Duration, Instant},
 };
 use tokio::sync::Mutex as AsyncMutex;
@@ -10,8 +10,7 @@ use tokio::time;
 use tokio::net::UdpSocket as TokioUdpSocket;
 use tauri::Manager;
 use serde::{Serialize, Deserialize};
-use chrono::{Utc, DateTime};
-// Aggiungere logging
+use chrono::Utc;
 use log::{info, warn, error};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -35,21 +34,45 @@ const BROADCAST_PORT: u16 = 40123;
 const HEARTBEAT_INTERVAL_SECS: u64 = 2;
 const DEVICE_TIMEOUT_SECS: u64 = 5;
 
+#[cfg(unix)]
+fn get_local_ip() -> Option<String> {
+    use ifaces::Interface;
+    if let Some(interface) = Interface::get_all().ok()?.into_iter().find(|iface| {
+        !iface.kind.is_loopback() &&
+        iface.addr.is_ipv4()
+    }) {
+        if let Some(ipv4) = interface.addr.ip() {
+            return Some(ipv4.to_string());
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
+fn get_local_ip() -> Option<String> {
+    use ipconfig;
+    for adapter in ipconfig::get_adapters().ok()? {
+        for ip in adapter.ip_addresses() {
+            if ip.is_ipv4() && !ip.is_loopback() {
+                return Some(ip.to_string());
+            }
+        }
+    }
+    None
+}
+
 #[tokio::main]
 async fn main() {
     let devices: SharedDevices = Arc::new(Mutex::new(Vec::new()));
     let devices_for_listener = devices.clone();
     let devices_for_cleanup = devices.clone();
 
-    // Launch UDP heartbeat sender
     tokio::spawn(async move {
         udp_broadcast_heartbeat_loop().await;
     });
-    // Launch UDP listener
     tokio::spawn(async move {
         udp_listener_loop(devices_for_listener).await;
     });
-    // Cleanup old devices
     tokio::spawn(async move {
         cleanup_loop(devices_for_cleanup).await;
     });
@@ -62,9 +85,11 @@ async fn main() {
 }
 
 async fn udp_broadcast_heartbeat_loop() {
-    let name = gethostname::gethostname().to_string_lossy().to_string();
+    let name = hostname::get()
+        .map(|h| h.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "Unknown".to_string());
     let port = BROADCAST_PORT;
-    let ip = get_local_ip().unwrap_or_else(|_| "0.0.0.0".to_string());
+    let ip = get_local_ip().unwrap_or_else(|| "0.0.0.0".to_string());
     let device = Device {
         name,
         ip,
@@ -102,13 +127,13 @@ async fn udp_listener_loop(devices: SharedDevices) {
         };
         // Ignore own heartbeat
         match get_local_ip() {
-            Ok(local_ip) => {
+            Some(local_ip) => {
                 if dev.ip == local_ip {
                     continue;
                 }
             }
-            Err(e) => {
-                warn!("Failed to get local IP: {}", e);
+            None => {
+                warn!("Failed to get local IP");
             }
         }
         let now = Instant::now();
@@ -136,6 +161,7 @@ async fn cleanup_loop(devices: SharedDevices) {
     }
 }
 
+/*
 fn get_local_ip() -> Result<String, std::io::Error> {
     // Try to get the local IP address (IPv4, non-loopback)
     let socket = UdpSocket::bind("0.0.0.0:0")?;
@@ -143,6 +169,7 @@ fn get_local_ip() -> Result<String, std::io::Error> {
     let local_addr = socket.local_addr()?;
     Ok(local_addr.ip().to_string())
 }
+*/
 
 #[tauri::command]
 fn get_devices(devices: tauri::State<'_, SharedDevices>) -> Vec<Device> {

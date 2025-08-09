@@ -26,3 +26,10 @@ tauri-plugin-log = "2"
 
 mdns = "0.2"
 chrono = { version = "0.4", features = ["serde"] }
+
+
+[target.'cfg(unix)'.dependencies]
+ifaces = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+ipconfig = "0.4"
