@@ -29,7 +29,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 
 [target.'cfg(unix)'.dependencies]
-ifaces = "0.2"
+ifaces = "0.1.0"
 
 [target.'cfg(windows)'.dependencies]
 ipconfig = "0.4"
