@@ -32,4 +32,4 @@ chrono = { version = "0.4", features = ["serde"] }
 ifaces = "0.1.0"
 
 [target.'cfg(windows)'.dependencies]
-ipconfig = "0.4"
+ipconfig = "0.3.2"
