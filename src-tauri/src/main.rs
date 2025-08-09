@@ -2,16 +2,16 @@
 
 use std::{
     sync::{Arc, Mutex},
-    net::{UdpSocket, SocketAddr},
+    net::{SocketAddr},
     time::{Duration, Instant},
 };
-use tokio::sync::Mutex as AsyncMutex;
 use tokio::time;
 use tokio::net::UdpSocket as TokioUdpSocket;
 use tauri::Manager;
 use serde::{Serialize, Deserialize};
 use chrono::Utc;
-use log::{info, warn, error};
+use log::{warn, error};
+use get_if_addrs::get_if_addrs;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Device {
@@ -34,27 +34,13 @@ const BROADCAST_PORT: u16 = 40123;
 const HEARTBEAT_INTERVAL_SECS: u64 = 2;
 const DEVICE_TIMEOUT_SECS: u64 = 5;
 
-#[cfg(unix)]
 fn get_local_ip() -> Option<String> {
-    use ifaces::Interface;
-    if let Some(interface) = Interface::get_all().ok()?.into_iter().find(|iface| {
-        !iface.kind.is_loopback() &&
-        iface.addr.is_ipv4()
-    }) {
-        if let Some(ipv4) = interface.addr.ip() {
-            return Some(ipv4.to_string());
-        }
-    }
-    None
-}
-
-#[cfg(windows)]
-fn get_local_ip() -> Option<String> {
-    use ipconfig;
-    for adapter in ipconfig::get_adapters().ok()? {
-        for ip in adapter.ip_addresses() {
-            if ip.is_ipv4() && !ip.is_loopback() {
-                return Some(ip.to_string());
+    if let Ok(addrs) = get_if_addrs() {
+        for iface in addrs {
+            if !iface.is_loopback() {
+                if let std::net::IpAddr::V4(ipv4) = iface.ip() {
+                    return Some(ipv4.to_string());
+                }
             }
         }
     }
@@ -160,16 +146,6 @@ async fn cleanup_loop(devices: SharedDevices) {
         time::sleep(Duration::from_secs(1)).await;
     }
 }
-
-/*
-fn get_local_ip() -> Result<String, std::io::Error> {
-    // Try to get the local IP address (IPv4, non-loopback)
-    let socket = UdpSocket::bind("0.0.0.0:0")?;
-    socket.connect("8.8.8.8:80")?;
-    let local_addr = socket.local_addr()?;
-    Ok(local_addr.ip().to_string())
-}
-*/
 
 #[tauri::command]
 fn get_devices(devices: tauri::State<'_, SharedDevices>) -> Vec<Device> {
