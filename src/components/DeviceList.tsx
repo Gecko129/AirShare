@@ -85,6 +85,8 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
           stability: d.stability !== undefined ? d.stability : 1,
         }));
 
+        const filteredDevices = mappedDevices.filter(device => device.airshareActive === true);
+
         console.log(`[DeviceList] Dispositivi dopo mapping (${mappedDevices.length}):`, mappedDevices);
         mappedDevices.forEach((device, index) => {
           console.log(`Dispositivo ${index}:`, {
@@ -95,7 +97,7 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
           });
         });
 
-        setDevices(mappedDevices);
+        setDevices(filteredDevices);
       } catch (error) {
         if (error instanceof Error) {
           console.error('[DeviceList] Errore fetch dispositivi:', error.message, error.stack);
