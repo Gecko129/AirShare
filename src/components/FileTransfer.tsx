@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Upload, X, File, Send, Users, AlertCircle } from 'lucide-react';
@@ -63,19 +64,47 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     setIsUploading(true);
     setUploadProgress({});
 
-    // Simula invio a ogni dispositivo con progresso individuale
+    // Per ora, placeholder per IP e porta; in futuro recupera dal deviceId.
+    // Esempio: deviceId = "192.168.1.10:9000"
     for (const deviceId of selectedDevices) {
-      // Simula progresso di upload per ogni dispositivo
-      for (let progress = 0; progress <= 100; progress += 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      let targetIp = '';
+      let targetPort = 0;
+      if (deviceId.includes(':')) {
+        const [ip, port] = deviceId.split(':');
+        targetIp = ip;
+        targetPort = parseInt(port, 10);
+      } else {
+        // fallback: deviceId as IP, porta di default
+        targetIp = deviceId;
+        targetPort = 9000;
+      }
+      try {
         setUploadProgress(prev => ({
           ...prev,
-          [deviceId]: progress
+          [deviceId]: 0
+        }));
+        // Chiamata al backend Tauri
+        await invoke('send_file', {
+          filePath: (selectedFile as any).path, // .path solo se fornito da Tauri drag&drop
+          targetIp,
+          targetPort
+        });
+        // Aggiorna progresso al 100% dopo il completamento (placeholder, implementare progresso reale in futuro)
+        setUploadProgress(prev => ({
+          ...prev,
+          [deviceId]: 100
+        }));
+      } catch (err) {
+        // Log errore e imposta progresso a 0 o -1 (se vuoi mostrare errore)
+        console.error(`Errore nell'invio a ${deviceId}:`, err);
+        setUploadProgress(prev => ({
+          ...prev,
+          [deviceId]: 0
         }));
       }
     }
 
-    // Aspetta un po' prima di completare
+    // Breve attesa per mostrare completamento
     await new Promise(resolve => setTimeout(resolve, 500));
 
     setIsUploading(false);
