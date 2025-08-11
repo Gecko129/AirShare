@@ -327,7 +327,7 @@ pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppH
         info!("File data flushed to socket.");
     }
 
-    // Gracefully close the write half to signal EOF to the server
+    // gracefully close the write half to signal EOF to the server
     if let Err(e) = AsyncWriteExt::shutdown(&mut stream).await {
         warn!("Socket shutdown after send failed: {}", e);
     } else {
