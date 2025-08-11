@@ -9,8 +9,9 @@ use tokio::{
 use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
 use uuid::Uuid;
-use log::{info, error};
+use log::{info, error, warn};
 use tokio::fs;
+use tokio::time::{timeout, Duration};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileOffer {
@@ -27,9 +28,9 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
     info!("File server listening on 0.0.0.0:40124");
     info!("Entering file server loop");
     loop {
-        let (mut socket, _addr) = match listener.accept().await {
+        let (mut socket, addr) = match listener.accept().await {
             Ok(res) => {
-                info!("Accepted new connection");
+                info!("Accepted new connection from {}", res.1);
                 res
             },
             Err(e) => {
@@ -37,14 +38,21 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 return Err(e.into());
             }
         };
+
+        if let Err(e) = socket.set_nodelay(true) {
+            warn!("Failed to set TCP_NODELAY on {}: {}", addr, e);
+        }
+
         let app_handle = app_handle.clone();
         tokio::spawn(async move {
             // Read header JSON until newline
             let mut header_buf = Vec::new();
+            info!("({addr}) Waiting for header JSON line (ending with \\n)...");
             loop {
                 let mut byte = [0u8; 1];
                 if let Err(e) = socket.read_exact(&mut byte).await {
-                    error!("Failed to read header byte: {}", e);
+                    error!("({addr}) Failed to read header byte (client closed early?): {}", e);
+                    // Could not read header at all -> nothing we can do; no ack to send
                     return;
                 }
                 if byte[0] == b'\n' {
@@ -53,68 +61,118 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 header_buf.push(byte[0]);
                 // Limit header size for safety
                 if header_buf.len() > 16 * 1024 {
-                    error!("Header too large");
+                    error!("({addr}) Header too large (>16KiB) without newline. Sending negative ack and closing.");
+                    let nack = serde_json::json!({ "accept": false, "error": "header too large or missing newline" });
+                    let nack_str = serde_json::to_string(&nack).unwrap() + "\n";
+                    if let Err(e) = socket.write_all(nack_str.as_bytes()).await {
+                        error!("({addr}) Failed to write negative ack: {}", e);
+                    } else {
+                        let _ = socket.flush().await;
+                        info!("({addr}) Negative ack sent for oversized header.");
+                    }
                     return;
                 }
             }
-            info!("Read header bytes, length: {}", header_buf.len());
+            info!("({addr}) Read header bytes, length: {}", header_buf.len());
             let header_str = match String::from_utf8(header_buf) {
                 Ok(s) => s,
                 Err(e) => {
-                    error!("Invalid header utf8: {}", e);
+                    error!("({addr}) Invalid header utf8: {}. Sending negative ack.", e);
+                    let nack = serde_json::json!({ "accept": false, "error": "invalid utf8 in header" });
+                    let nack_str = serde_json::to_string(&nack).unwrap() + "\n";
+                    if let Err(w) = socket.write_all(nack_str.as_bytes()).await {
+                        error!("({addr}) Failed to write negative ack: {}", w);
+                    } else {
+                        let _ = socket.flush().await;
+                        info!("({addr}) Negative ack sent due to UTF-8 error.");
+                    }
                     return;
                 }
             };
-            info!("Received header: {}", header_str);
+            info!("({addr}) Received header line: {}", header_str);
+
             let offer: FileOffer = match serde_json::from_str(&header_str) {
                 Ok(o) => o,
                 Err(e) => {
-                    error!("Invalid header JSON: {}", e);
+                    error!("({addr}) Invalid header JSON: {}. Sending negative ack.", e);
+                    let nack = serde_json::json!({ "accept": false, "error": "invalid json" });
+                    let nack_str = serde_json::to_string(&nack).unwrap() + "\n";
+                    if let Err(w) = socket.write_all(nack_str.as_bytes()).await {
+                        error!("({addr}) Failed to write negative ack: {}", w);
+                    } else {
+                        let _ = socket.flush().await;
+                        info!("({addr}) Negative ack sent due to JSON parse error.");
+                    }
                     return;
                 }
             };
-            info!("Parsed file offer: {:?}", offer);
+            info!("({addr}) Parsed file offer: {:?}", offer);
+
             // Emit event to frontend
             let transfer_id = offer.transfer_id.clone();
-            info!("Emitting transfer_request event for id: {}", transfer_id);
+            info!("({addr}) Emitting transfer_request event for id: {}", transfer_id);
             let _ = app_handle.emit("transfer_request", &offer);
-            // Simulate accept for now
+
+            // For now, auto-accept
             let accept = true;
-            // Send ack JSON (could be expanded for real user response)
-            let ack = serde_json::json!({ "accept": accept });
+
+            // Send ack JSON (expanded for potential error reporting)
+            let ack = if accept {
+                serde_json::json!({ "accept": true })
+            } else {
+                serde_json::json!({ "accept": false })
+            };
             let ack_str = serde_json::to_string(&ack).unwrap() + "\n";
-            if let Err(e) = socket.write_all(ack_str.as_bytes()).await {
-                error!("Failed to write ack: {}", e);
-                return;
+            match socket.write_all(ack_str.as_bytes()).await {
+                Ok(_) => {
+                    info!("({addr}) Sent ack to client: {}", ack_str.trim_end());
+                    if let Err(e) = socket.flush().await {
+                        warn!("({addr}) Flush after ack failed: {}", e);
+                    }
+                }
+                Err(e) => {
+                    error!("({addr}) Failed to write ack: {}", e);
+                    return;
+                }
             }
-            info!("Sent ack to client");
             if !accept {
-                info!("Transfer rejected");
+                info!("({addr}) Transfer rejected by server policy.");
                 return;
             }
+
             // Create temp file
             let temp_path = std::env::temp_dir().join(format!("airshare-{}", offer.file_name));
+            info!("({addr}) Creating destination file at {:?}", temp_path);
             let mut file = match fs::File::create(&temp_path).await {
                 Ok(f) => f,
                 Err(e) => {
-                    error!("Failed to create file: {}", e);
+                    error!("({addr}) Failed to create file: {}", e);
                     return;
                 }
             };
+
+            // Receive exactly offer.file_size bytes
             let mut received: u64 = 0;
             let mut buffer = vec![0u8; 64 * 1024];
+            info!("({addr}) Beginning binary receive of {} bytes for transfer {}", offer.file_size, transfer_id);
             while received < offer.file_size {
                 let to_read = std::cmp::min(buffer.len() as u64, offer.file_size - received) as usize;
                 let n = match socket.read(&mut buffer[..to_read]).await {
-                    Ok(0) => break,
+                    Ok(0) => {
+                        error!(
+                            "({addr}) Peer closed connection early at {} / {} bytes for transfer {}",
+                            received, offer.file_size, transfer_id
+                        );
+                        return;
+                    }
                     Ok(n) => n,
                     Err(e) => {
-                        error!("Error receiving file: {}", e);
+                        error!("({addr}) Error receiving file: {}", e);
                         return;
                     }
                 };
                 if let Err(e) = file.write_all(&buffer[..n]).await {
-                    error!("File write error: {}", e);
+                    error!("({addr}) File write error: {}", e);
                     return;
                 }
                 received += n as u64;
@@ -125,13 +183,23 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                     "total": offer.file_size
                 });
                 let _ = app_handle.emit("transfer_progress", progress);
-                info!("Received {} / {} bytes", received, offer.file_size);
+                info!("({addr}) Received {} / {} bytes", received, offer.file_size);
             }
+
+            if let Err(e) = file.sync_all().await {
+                warn!("({addr}) Failed to fsync file {:?}: {}", temp_path, e);
+            }
+
             let _ = app_handle.emit("transfer_complete", serde_json::json!({
                 "transfer_id": transfer_id,
                 "path": temp_path,
             }));
-            info!("File transfer complete: {:?}", temp_path);
+            info!("({addr}) File transfer complete: {:?}", temp_path);
+
+            // Gracefully shutdown write half (if any) to signal proper end
+            if let Err(e) = AsyncWriteExt::shutdown(&mut socket).await {
+                warn!("({addr}) Socket shutdown after receive failed: {}", e);
+            }
         });
     }
 }
@@ -160,18 +228,25 @@ pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppH
             return Err(e.into());
         }
     };
-    // Send header JSON + newline
-    let header = serde_json::to_string(&offer)? + "\n";
-    // Log the header content as JSON string before sending
-    info!("Header JSON to send: {}", header.trim_end());
-    match stream.write_all(header.as_bytes()).await {
-        Ok(_) => info!("Sent header to target"),
-        Err(e) => {
-            error!("Failed to send header: {}", e);
-            return Err(e.into());
-        }
+    if let Err(e) = stream.set_nodelay(true) {
+        warn!("Failed to set TCP_NODELAY on client socket to {}: {}", addr, e);
     }
-    // Await ack
+
+    // Send header JSON + newline
+    let header_line = serde_json::to_string(&offer)? + "\n";
+    info!("Sending header line: {}", header_line.trim_end());
+    if let Err(e) = stream.write_all(header_line.as_bytes()).await {
+        error!("Failed to send header: {}", e);
+        return Err(e.into());
+    }
+    if let Err(e) = stream.flush().await {
+        warn!("Flush after sending header failed: {}", e);
+    } else {
+        info!("Header sent and flushed.");
+    }
+
+    // Await ack line strictly before sending any binary
+    info!("Waiting for ack line from server...");
     let mut ack_buf = Vec::new();
     loop {
         let mut byte = [0u8; 1];
@@ -184,7 +259,7 @@ pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppH
         }
         ack_buf.push(byte[0]);
         if ack_buf.len() > 8 * 1024 {
-            error!("Ack too large");
+            error!("Ack too large (>8KiB) without newline");
             anyhow::bail!("Ack too large");
         }
     }
@@ -195,7 +270,7 @@ pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppH
             return Err(e.into());
         }
     };
-    info!("Received ack: {}", ack_str);
+    info!("Received ack line: {}", ack_str);
     let ack_json: serde_json::Value = match serde_json::from_str(&ack_str) {
         Ok(val) => val,
         Err(e) => {
@@ -203,10 +278,14 @@ pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppH
             return Err(e.into());
         }
     };
-    if !ack_json.get("accept").and_then(|v| v.as_bool()).unwrap_or(false) {
-        error!("Transfer rejected by peer");
-        anyhow::bail!("Transfer rejected by peer");
+    let accepted = ack_json.get("accept").and_then(|v| v.as_bool()).unwrap_or(false);
+    if !accepted {
+        let err_msg = ack_json.get("error").and_then(|v| v.as_str()).unwrap_or("rejected");
+        error!("Transfer rejected by peer: {}", err_msg);
+        anyhow::bail!("Transfer rejected by peer: {}", err_msg);
     }
+    info!("Ack accepted by server. Beginning binary transfer of {} bytes (transfer_id={})", file_size, transfer_id);
+
     // Send file in chunks
     let mut file = match fs::File::open(&path).await {
         Ok(f) => f,
@@ -228,11 +307,11 @@ pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppH
         };
         if n == 0 { break; }
         if let Err(e) = stream.write_all(&buffer[..n]).await {
-            error!("Failed to send file chunk: {}", e);
+            error!("Failed to send file chunk at {} bytes: {}", sent, e);
             return Err(e.into());
         }
         sent += n as u64;
-        // Emit progress
+
         let progress = serde_json::json!({
             "transfer_id": transfer_id,
             "sent": sent,
@@ -241,6 +320,20 @@ pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppH
         let _ = app_handle.emit("transfer_progress", progress);
         info!("Sent {} / {} bytes", sent, file_size);
     }
+
+    if let Err(e) = stream.flush().await {
+        warn!("Flush after sending file failed: {}", e);
+    } else {
+        info!("File data flushed to socket.");
+    }
+
+    // Gracefully close the write half to signal EOF to the server
+    if let Err(e) = AsyncWriteExt::shutdown(&mut stream).await {
+        warn!("Socket shutdown after send failed: {}", e);
+    } else {
+        info!("Write half shutdown completed.");
+    }
+
     let _ = app_handle.emit("transfer_complete", serde_json::json!({
         "transfer_id": transfer_id,
         "path": path,
