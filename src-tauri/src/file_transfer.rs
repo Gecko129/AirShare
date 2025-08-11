@@ -1,18 +1,16 @@
 
 
+
+use tauri::Emitter;
 use tokio::{
     net::{TcpListener, TcpStream},
     io::{AsyncReadExt, AsyncWriteExt},
 };
 use serde::{Serialize, Deserialize};
-use std::{
-    sync::{Arc, Mutex},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 use uuid::Uuid;
 use log::{info, error};
 use tokio::fs;
-use tauri::Manager;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileOffer {
@@ -28,7 +26,7 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
     let listener = TcpListener::bind("0.0.0.0:40124").await?;
     info!("File server listening on 0.0.0.0:40124");
     loop {
-        let (mut socket, addr) = listener.accept().await?;
+        let (mut socket, _addr) = listener.accept().await?;
         let app_handle = app_handle.clone();
         tokio::spawn(async move {
             // Read header JSON until newline
@@ -66,7 +64,7 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             info!("Incoming file offer: {:?}", offer);
             // Emit event to frontend
             let transfer_id = offer.transfer_id.clone();
-            let _ = app_handle.emit_all("transfer_request", &offer);
+            let _ = app_handle.emit("transfer_request", &offer);
             // Simulate accept for now
             let accept = true;
             // Send ack JSON (could be expanded for real user response)
@@ -112,9 +110,9 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                     "received": received,
                     "total": offer.file_size
                 });
-                let _ = app_handle.emit_all("transfer_progress", progress);
+                let _ = app_handle.emit("transfer_progress", progress);
             }
-            let _ = app_handle.emit_all("transfer_complete", serde_json::json!({
+            let _ = app_handle.emit("transfer_complete", serde_json::json!({
                 "transfer_id": transfer_id,
                 "path": temp_path,
             }));
@@ -176,9 +174,9 @@ pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppH
             "sent": sent,
             "total": file_size
         });
-        let _ = app_handle.emit_all("transfer_progress", progress);
+        let _ = app_handle.emit("transfer_progress", progress);
     }
-    let _ = app_handle.emit_all("transfer_complete", serde_json::json!({
+    let _ = app_handle.emit("transfer_complete", serde_json::json!({
         "transfer_id": transfer_id,
         "path": path,
     }));

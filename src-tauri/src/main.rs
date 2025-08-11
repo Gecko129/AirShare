@@ -1,4 +1,8 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![allow(unused_imports)]
+#[cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+use tauri::Manager;
+
+mod file_transfer;
 
 use std::{
     sync::{Arc, Mutex},
@@ -7,7 +11,6 @@ use std::{
 };
 use tokio::time;
 use tokio::net::UdpSocket as TokioUdpSocket;
-use tauri::Manager;
 use serde::{Serialize, Deserialize};
 use chrono::Utc;
 use log::{warn, error};
@@ -15,6 +18,7 @@ use get_if_addrs::get_if_addrs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use std::path::Path;
+use tauri::Emitter;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Device {
@@ -50,24 +54,40 @@ fn get_local_ip() -> Option<String> {
     None
 }
 
+use tauri_plugin_dialog;
+
 #[tokio::main]
 async fn main() {
     let devices: SharedDevices = Arc::new(Mutex::new(Vec::new()));
-    let devices_for_listener = devices.clone();
-    let devices_for_cleanup = devices.clone();
-
-    tokio::spawn(async move {
-        udp_broadcast_heartbeat_loop().await;
-    });
-    tokio::spawn(async move {
-        udp_listener_loop(devices_for_listener).await;
-    });
-    tokio::spawn(async move {
-        cleanup_loop(devices_for_cleanup).await;
-    });
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(devices)
+        .setup(|app| {
+            // Clone the app handle before moving it into async tasks
+            let app_handle = app.handle().clone();
+            let devices_for_listener = app.state::<SharedDevices>().inner().clone();
+            let devices_for_cleanup = app.state::<SharedDevices>().inner().clone();
+
+            // Now spawn the tasks with the cloned handle
+            tokio::spawn(async move {
+                if let Err(e) = file_transfer::start_file_server(app_handle).await {
+                    error!("File server error: {}", e);
+                }
+            });
+
+            tokio::spawn(async move {
+                udp_broadcast_heartbeat_loop().await;
+            });
+            tokio::spawn(async move {
+                udp_listener_loop(devices_for_listener).await;
+            });
+            tokio::spawn(async move {
+                cleanup_loop(devices_for_cleanup).await;
+            });
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![get_devices, send_file])
         .run(tauri::generate_context!())
         .expect("error running tauri app");
