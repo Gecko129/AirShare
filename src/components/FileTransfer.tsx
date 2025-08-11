@@ -18,6 +18,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [deviceNames, setDeviceNames] = useState<Record<string, string>>({});
+
   // Aggiorna deviceNames quando onDevicesUpdate viene chiamato dal componente padre
   useEffect(() => {
     if (!onDevicesUpdate) return;
@@ -52,8 +53,10 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('File selezionato dall\'input');
     const files = e.target.files;
     if (files && files.length > 0) {
+      console.log('File:', files[0].name, 'Dimensione:', files[0].size);
       setSelectedFile(files[0]);
     }
   };
@@ -83,12 +86,15 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           ...prev,
           [deviceId]: 0
         }));
+
         // Chiamata al backend Tauri
+        // Nota: potremmo dover convertire il File in un path o usare FileReader per i dati
         await invoke('send_file', {
-          filePath: (selectedFile as any).path, // .path solo se fornito da Tauri drag&drop
+          filePath: (selectedFile as any).path || selectedFile.name, // .path solo se fornito da Tauri drag&drop
           targetIp,
           targetPort
         });
+
         // Aggiorna progresso al 100% dopo il completamento (placeholder, implementare progresso reale in futuro)
         setUploadProgress(prev => ({
           ...prev,
@@ -160,7 +166,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                 {isUploading && uploadProgress[deviceId] !== undefined && (
                   <div className="flex items-center gap-2">
                     <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-slate-400 transition-all duration-300"
                         style={{ width: `${uploadProgress[deviceId]}%` }}
                       />
@@ -179,10 +185,13 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => {
+          console.log('Click su drop area, aprendo dialog...');
+          fileInputRef.current?.click();
+        }}
         className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${
-          isDragging 
-            ? 'border-slate-500/60 bg-slate-700/20' 
+          isDragging
+            ? 'border-slate-500/60 bg-slate-700/20'
             : 'border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-800/20'
         }`}
       >
