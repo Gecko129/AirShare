@@ -31,6 +31,7 @@ chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0.98"
 uuid = { version = "1.18.0", features = ["v4"] }
 mime_guess = "2.0.5"
+dirs = "6.0.0"
 
 [target.'cfg(windows)'.dependencies]
 ipconfig = "0.3.2"
