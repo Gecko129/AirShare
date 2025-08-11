@@ -80,7 +80,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     setUploadProgress({});
 
     // Per ora, placeholder per IP e porta; in futuro recupera dal deviceId.
-    // Esempio: deviceId = "192.168.1.10:9000"
+    // Esempio: deviceId = "192.168.1.10:40124"
     for (const deviceId of selectedDevices) {
       let targetIp = '';
       let targetPort = 0;
@@ -91,7 +91,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
       } else {
         // fallback: deviceId as IP, porta di default
         targetIp = deviceId;
-        targetPort = 9000;
+        targetPort = 40124;
       }
       console.log("Invio a deviceId:", deviceId, "IP:", targetIp, "Porta:", targetPort);
       try {
