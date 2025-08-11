@@ -1,6 +1,3 @@
-
-
-
 use tauri::Emitter;
 use tokio::{
     net::{TcpListener, TcpStream},
@@ -12,6 +9,8 @@ use uuid::Uuid;
 use log::{info, error, warn};
 use tokio::fs;
 use tokio::time::{timeout, Duration};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use dirs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileOffer {
@@ -141,7 +140,13 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             }
 
             // Create temp file
-            let temp_path = std::env::temp_dir().join(format!("airshare-{}", offer.file_name));
+            let mut documents_dir = dirs::document_dir().unwrap_or(std::env::temp_dir());
+            documents_dir.push("AirShare");
+            if let Err(e) = tokio::fs::create_dir_all(&documents_dir).await {
+                error!("Failed to create AirShare directory: {}", e);
+                return;
+            }
+            let temp_path = documents_dir.join(&offer.file_name);
             info!("({addr}) Creating destination file at {:?}", temp_path);
             let mut file = match fs::File::create(&temp_path).await {
                 Ok(f) => f,
@@ -190,6 +195,11 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 warn!("({addr}) Failed to fsync file {:?}: {}", temp_path, e);
             }
 
+            app_handle.dialog().message(format!("File '{}' salvato in '{}'", offer.file_name, temp_path.display()))
+                .title("AirShare")
+                .kind(tauri_plugin_dialog::MessageDialogKind::Info)
+                .show(|_| {});
+
             let _ = app_handle.emit("transfer_complete", serde_json::json!({
                 "transfer_id": transfer_id,
                 "path": temp_path,
@@ -205,8 +215,8 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
 }
 
 /// Send a file to a peer over TCP.
-pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppHandle) -> anyhow::Result<()> {
-    info!("Starting file send to {} with path {:?}", target_ip, path);
+pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_handle: tauri::AppHandle) -> anyhow::Result<()> {
+    info!("Starting file send to {}:{} with path {:?}", target_ip, target_port, path);
     let metadata = fs::metadata(&path).await?;
     let file_size = metadata.len();
     let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string();
@@ -219,7 +229,7 @@ pub async fn send_file(target_ip: String, path: PathBuf, app_handle: tauri::AppH
         mime,
         sha256: None,
     };
-    let addr = format!("{}:40124", target_ip);
+    let addr = format!("{}:{}", target_ip, target_port);
     info!("Connecting to target address: {}", addr);
     let mut stream = match TcpStream::connect(&addr).await {
         Ok(s) => s,

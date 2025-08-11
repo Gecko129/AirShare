@@ -177,61 +177,10 @@ fn get_devices(devices: tauri::State<'_, SharedDevices>) -> Vec<Device> {
 }
 
 #[tauri::command]
-async fn send_file(ip: String, port: u16, file_path: String) -> Result<String, String> {
-    let path = Path::new(&file_path);
-    let file_name = match path.file_name().and_then(|n| n.to_str()) {
-        Some(name) => name.to_string(),
-        None => return Err("Invalid file name".into()),
-    };
-
-    let mut file = match tokio::fs::File::open(&file_path).await {
-        Ok(f) => f,
-        Err(e) => return Err(e.to_string()),
-    };
-
-    let metadata = match file.metadata().await {
-        Ok(m) => m,
-        Err(e) => return Err(e.to_string()),
-    };
-
-    let file_size = metadata.len();
-
-    let addr = format!("{}:{}", ip, port);
-    let mut stream = match TcpStream::connect(addr).await {
-        Ok(s) => s,
-        Err(e) => return Err(e.to_string()),
-    };
-
-    let header = serde_json::json!({
-        "file_name": file_name,
-        "file_size": file_size,
-    });
-
-    let header_str = header.to_string();
-    let header_bytes = header_str.as_bytes();
-    let header_len = header_bytes.len() as u32;
-
-    // Send header length as 4 bytes big endian
-    if let Err(e) = stream.write_all(&header_len.to_be_bytes()).await {
-        return Err(e.to_string());
+async fn send_file(app_handle: tauri::AppHandle, ip: String, port: u16, file_path: String) -> Result<String, String> {
+    let path = std::path::PathBuf::from(file_path);
+    match file_transfer::send_file(ip, port, path, app_handle).await {
+        Ok(_) => Ok("File inviato con successo".into()),
+        Err(e) => Err(e.to_string()),
     }
-    // Send header bytes
-    if let Err(e) = stream.write_all(header_bytes).await {
-        return Err(e.to_string());
-    }
-
-    let mut buffer = [0u8; 8192];
-    loop {
-        match file.read(&mut buffer).await {
-            Ok(0) => break,
-            Ok(n) => {
-                if let Err(e) = stream.write_all(&buffer[..n]).await {
-                    return Err(e.to_string());
-                }
-            }
-            Err(e) => return Err(e.to_string()),
-        }
-    }
-
-    Ok("File inviato con successo".into())
 }
