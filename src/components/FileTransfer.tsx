@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Upload, X, File, Send, Users, AlertCircle } from 'lucide-react';
@@ -15,22 +16,23 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [deviceNames, setDeviceNames] = useState<Record<string, string>>({});
 
   // Aggiorna deviceNames quando onDevicesUpdate viene chiamato dal componente padre
-  useEffect(() => {
-    if (!onDevicesUpdate) return;
-    const updateNames = (devices: Device[]) => {
-      const names: Record<string, string> = {};
-      devices.forEach(device => {
-        names[device.id] = device.name;
-      });
-      setDeviceNames(names);
-    };
-    onDevicesUpdate(updateNames);
-  }, [onDevicesUpdate]);
+    useEffect(() => {
+        if (!onDevicesUpdate) return;
+        // Qui aggiorniamo i nomi dei device tramite callback fornita dal padre
+        const updateNames = (devices: Device[]) => {
+          const names: Record<string, string> = {};
+          devices.forEach(device => {
+            names[device.id] = device.name;
+          });
+          setDeviceNames(names);
+        };
+        // Fornisci la funzione updateNames come callback al parent
+        onDevicesUpdate(updateNames);
+      }, [onDevicesUpdate]);
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -38,6 +40,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
 
     const files = e.dataTransfer.files;
     if (files.length > 0) {
+      console.log("File droppato:", files[0].name);
       setSelectedFile(files[0]);
     }
   };
@@ -52,17 +55,26 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     setIsDragging(false);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('File selezionato dall\'input');
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      console.log('File:', files[0].name, 'Dimensione:', files[0].size);
-      setSelectedFile(files[0]);
+  const handleFileDialog = async () => {
+    console.log("Apertura finestra di dialogo file");
+    const selected = await open({ multiple: false });
+    if (selected) {
+      if (typeof selected === 'string') {
+        console.log("File selezionato:", selected);
+        // crea un oggetto File simulato
+        setSelectedFile({
+          name: selected.split(/[\\/]/).pop() || 'file',
+          size: 0, // dimensione non nota
+          path: selected // aggiunta path per backend
+        } as any);
+      }
     }
   };
 
   const handleSend = async () => {
     if (!selectedFile || selectedDevices.length === 0) return;
+
+    console.log("Inizio invio file", selectedFile, selectedDevices);
 
     setIsUploading(true);
     setUploadProgress({});
@@ -81,6 +93,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         targetIp = deviceId;
         targetPort = 9000;
       }
+      console.log("Invio a deviceId:", deviceId, "IP:", targetIp, "Porta:", targetPort);
       try {
         setUploadProgress(prev => ({
           ...prev,
@@ -89,20 +102,23 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
 
         // Chiamata al backend Tauri
         // Nota: potremmo dover convertire il File in un path o usare FileReader per i dati
-        await invoke('send_file', {
-          filePath: (selectedFile as any).path || selectedFile.name, // .path solo se fornito da Tauri drag&drop
-          targetIp,
-          targetPort
-        });
+        const invokeArgs = {
+          filePath: (selectedFile as any).path || selectedFile.name,
+          ip: targetIp,
+          port: targetPort
+        };
+        console.log("Chiamata invoke con argomenti:", invokeArgs);
+        await invoke('send_file', invokeArgs);
 
         // Aggiorna progresso al 100% dopo il completamento (placeholder, implementare progresso reale in futuro)
         setUploadProgress(prev => ({
           ...prev,
           [deviceId]: 100
         }));
+        console.log("Invio completato per", deviceId);
       } catch (err) {
         // Log errore e imposta progresso a 0 o -1 (se vuoi mostrare errore)
-        console.error(`Errore nell'invio a ${deviceId}:`, err);
+        console.error("Errore durante l'invio a", deviceId, err);
         setUploadProgress(prev => ({
           ...prev,
           [deviceId]: 0
@@ -116,18 +132,11 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     setIsUploading(false);
     setSelectedFile(null);
     setUploadProgress({});
-
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    console.log("Invio terminato");
   };
 
   const removeFile = () => {
     setSelectedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -185,24 +194,13 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onClick={() => {
-          console.log('Click su drop area, aprendo dialog...');
-          fileInputRef.current?.click();
-        }}
+        onClick={handleFileDialog}
         className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${
           isDragging
             ? 'border-slate-500/60 bg-slate-700/20'
             : 'border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-800/20'
         }`}
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          onChange={handleFileSelect}
-          className="hidden"
-          accept="*/*"
-        />
-
         <AnimatePresence mode="wait">
           {!selectedFile ? (
             <motion.div

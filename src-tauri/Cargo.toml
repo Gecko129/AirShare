@@ -24,10 +24,14 @@ gethostname = "0.4"
 hostname = "0.4"
 tauri = { version = "2.7.0", features = [] }
 tauri-plugin-log = "2"
+tauri-plugin-dialog = "2.3.2"
 get_if_addrs = "0.5"
 
 mdns = "0.2"
 chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0.98"
+uuid = { version = "1.18.0", features = ["v4"] }
+mime_guess = "2.0.5"
 
 
 [target.'cfg(windows)'.dependencies]
