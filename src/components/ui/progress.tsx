@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as ProgressPrimitive from "@radix-ui/react-progress";
+import { listen } from "@tauri-apps/api/event";
 
 import { cn } from "./utils";
 
@@ -10,6 +11,15 @@ function Progress({
   value,
   ...props
 }: React.ComponentProps<typeof ProgressPrimitive.Root>) {
+  const [progress, setProgress] = React.useState(0);
+
+  React.useEffect(() => {
+    const unlisten = listen<number>("file_progress", (event) => setProgress(event.payload));
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
   return (
     <ProgressPrimitive.Root
       data-slot="progress"
@@ -22,7 +32,7 @@ function Progress({
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
         className="bg-primary h-full w-full flex-1 transition-all"
-        style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+        style={{ transform: `translateX(-${100 - progress}%)` }}
       />
     </ProgressPrimitive.Root>
   );

@@ -322,6 +322,9 @@ pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_h
         }
         sent += n as u64;
 
+        let progress_percentage = (sent as f64 / file_size as f64) * 100.0;
+        let _ = app_handle.emit("file_progress", progress_percentage);
+
         let progress = serde_json::json!({
             "transfer_id": transfer_id,
             "sent": sent,
