@@ -3,6 +3,32 @@
 version = 3
 
 [[package]]
+name = "AirShare"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.9.1",
+ "chrono",
+ "dirs",
+ "get_if_addrs",
+ "gethostname",
+ "hostname",
+ "ipconfig",
+ "local-ip-address",
+ "log",
+ "mdns",
+ "mime_guess",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-log",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -89,31 +115,6 @@ name = "anyhow"
 version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
-
-[[package]]
-name = "app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "dirs",
- "get_if_addrs",
- "gethostname",
- "hostname",
- "ipconfig",
- "local-ip-address",
- "log",
- "mdns",
- "mime_guess",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-log",
- "tokio",
- "uuid",
-]
 
 [[package]]
 name = "arrayvec"

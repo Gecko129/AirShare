@@ -1,10 +1,10 @@
 [package]
-name = "app"
+name = "AirShare"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "AirShare - Lightning-fast, lossless file transfer over your local network"
+authors = ["Gianlu1107 (Gianluca Morello)", "Gecko129 (Filippo)"]
+license = "AGPL-3.0"
+repository = "https://github.com/Gecko129/AirShare"
 edition = "2021"
 rust-version = "1.77.2"
 
@@ -32,6 +32,7 @@ anyhow = "1.0.98"
 uuid = { version = "1.18.0", features = ["v4"] }
 mime_guess = "2.0.5"
 dirs = "6.0.0"
+bitflags = "2.9.1"
 
 [target.'cfg(windows)'.dependencies]
 ipconfig = "0.3.2"
