@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Upload, X, File, Send, Users, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import type { Device } from '../types/device';
 
 interface FileTransferProps {
   selectedDevices: string[];
