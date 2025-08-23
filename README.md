@@ -70,7 +70,7 @@ Your feedback helps improve AirShare!
 
 ---
 
-## 📜 License
+##  License
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.  
 You may copy, distribute, and modify the software as long as you disclose your source code under the same license.  
