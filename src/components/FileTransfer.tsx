@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Button } from './ui/button';
@@ -9,7 +9,7 @@ import type { Device } from '../types/device';
 
 interface FileTransferProps {
   selectedDevices: string[];
-  onDevicesUpdate?: (devices: Device[]) => void;
+  onDevicesUpdate?: (callback: (devices: Device[]) => void) => void;
 }
 
 export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferProps) {
@@ -234,7 +234,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                   <p className="text-gray-400 text-sm">{formatFileSize(selectedFile.size)}</p>
                 </div>
                 <Button
-                  onClick={(e) => {
+                  onClick={(e: React.MouseEvent) => {
                     e.stopPropagation();
                     removeFile();
                   }}
