@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -19,6 +20,85 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
   const [deviceNames, setDeviceNames] = useState<Record<string, string>>({});
+
+  // Ascolta gli eventi di progresso/completamento dal backend (solo invio)
+  useEffect(() => {
+    let unlistenProgress: (() => void) | undefined;
+    let unlistenComplete: (() => void) | undefined;
+    let unlistenBackendLog: (() => void) | undefined;
+
+    (async () => {
+      unlistenProgress = await listen('transfer_progress', (event: { payload: any }) => {
+        const p = event.payload as any;
+        if (p?.direction === 'send' && p?.ip && p?.port) {
+          const deviceKey = `${p.ip}:${p.port}`;
+          const percent = typeof p.percent === 'number'
+            ? Math.min(100, Math.max(0, Math.round(p.percent)))
+            : p.total ? Math.round((p.sent / p.total) * 100) : 0;
+          setUploadProgress(prev => ({
+            ...prev,
+            [deviceKey]: percent,
+          }));
+        }
+      });
+
+      unlistenComplete = await listen('transfer_complete', (event: { payload: any }) => {
+        const p = event.payload as any;
+        if (p?.direction === 'send' && p?.ip && p?.port) {
+          const deviceKey = `${p.ip}:${p.port}`;
+          setUploadProgress(prev => ({
+            ...prev,
+            [deviceKey]: 100,
+          }));
+        }
+      });
+
+      // Log backend_log events to console and aggiorna progress da stringa
+      unlistenBackendLog = await listen('backend_log', (event: { payload: any }) => {
+        const p = event.payload as any;
+        const level = p?.level ?? 'info';
+        const msg = String(p?.message ?? '');
+        // eslint-disable-next-line no-console
+        console.log(`[backend][${level}]`, msg);
+
+        // Esempi attesi:
+        // "send progress | id=... ip=1.2.3.4 port=40124 sent=123 total=456 percent=27.3"
+        // "send complete | id=... ip=1.2.3.4 port=40124 path=/..."
+        // Parse progress
+        const progressMatch = msg.match(/^(send|recv) progress \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) (?:sent|received)=([0-9]+) total=([0-9]+) percent=([0-9.]+)/);
+        if (progressMatch) {
+          const direction = progressMatch[1];
+          const ip = progressMatch[3];
+          const port = progressMatch[4];
+          const percentStr = progressMatch[7];
+          const percentNum = Number.parseFloat(percentStr);
+          if (direction === 'send' && ip && port && Number.isFinite(percentNum)) {
+            const deviceKey = `${ip}:${port}`;
+            const percent = Math.max(0, Math.min(100, Math.round(percentNum)));
+            setUploadProgress(prev => ({ ...prev, [deviceKey]: percent }));
+          }
+          return;
+        }
+
+        // Parse complete
+        const completeMatch = msg.match(/^send complete \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) path=/);
+        if (completeMatch) {
+          const ip = completeMatch[2];
+          const port = completeMatch[3];
+          if (ip && port) {
+            const deviceKey = `${ip}:${port}`;
+            setUploadProgress(prev => ({ ...prev, [deviceKey]: 100 }));
+          }
+        }
+      });
+    })();
+
+    return () => {
+      if (unlistenProgress) unlistenProgress();
+      if (unlistenComplete) unlistenComplete();
+      if (unlistenBackendLog) unlistenBackendLog();
+    };
+  }, []);
 
   // Aggiorna deviceNames quando onDevicesUpdate viene chiamato dal componente padre
     useEffect(() => {
@@ -111,11 +191,6 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         console.log("Chiamata invoke con argomenti:", invokeArgs);
         await invoke('send_file', invokeArgs);
 
-        // Aggiorna progresso al 100% dopo il completamento (placeholder, implementare progresso reale in futuro)
-        setUploadProgress(prev => ({
-          ...prev,
-          [deviceId]: 100
-        }));
         console.log("Invio completato per", deviceId);
       } catch (err) {
         // Log errore e imposta progresso a 0 o -1 (se vuoi mostrare errore)
