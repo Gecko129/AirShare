@@ -23,6 +23,34 @@ pub struct FileOffer {
     pub sha256: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileInfo {
+    pub size: u64,
+    pub name: String,
+    pub is_file: bool,
+}
+
+/// Get file information for a given file path
+#[tauri::command]
+pub fn get_file_info(file_path: String) -> Result<FileInfo, String> {
+    match std::fs::metadata(&file_path) {
+        Ok(metadata) => {
+            let name = std::path::Path::new(&file_path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+                
+            Ok(FileInfo {
+                size: metadata.len(),
+                name,
+                is_file: metadata.is_file(),
+            })
+        }
+        Err(e) => Err(format!("Failed to get file info: {}", e)),
+    }
+}
+
 /// Emit a backend_log event to the frontend with a level and message
 pub async fn tauri_log(app_handle: &AppHandle, level: &str, message: impl Into<String>) {
     let payload = serde_json::json!({

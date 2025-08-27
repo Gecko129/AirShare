@@ -88,7 +88,7 @@ async fn main() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_devices, send_file])
+        .invoke_handler(tauri::generate_handler![get_devices, send_file, file_transfer::get_file_info])
         .run(tauri::generate_context!())
         .expect("error running tauri app");
 }

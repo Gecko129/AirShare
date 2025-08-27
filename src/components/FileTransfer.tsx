@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Upload, X, File, Send, Users, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { stat } from '@tauri-apps/plugin-fs';
+// usa il backend Tauri get_file_info invece del plugin-fs
 import type { Device } from '../types/device';
 
 interface FileTransferProps {
@@ -145,14 +145,14 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         console.log("File selezionato:", selected);
         
         try {
-          // Ottieni le informazioni del file usando stat
-          const fileInfo = await stat(selected);
-          
+          // Ottieni le informazioni del file dal backend Tauri
+          const fileInfo = await invoke<{ size: number; name: string; is_file: boolean }>('get_file_info', { filePath: selected });
+
           // Crea un oggetto File simulato con la dimensione reale
           setSelectedFile({
-            name: selected.split(/[\\/]/).pop() || 'file',
-            size: fileInfo.size, // Ora abbiamo la dimensione reale in bytes
-            path: selected // aggiunta path per backend
+            name: fileInfo?.name || (selected.split(/[\\/]/).pop() || 'file'),
+            size: typeof fileInfo?.size === 'number' ? fileInfo.size : 0,
+            path: selected
           } as any);
         } catch (error) {
           console.error("Errore nel leggere le informazioni del file:", error);
