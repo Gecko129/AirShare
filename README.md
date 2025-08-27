@@ -37,6 +37,15 @@ Download the latest release from the [Releases](https://github.com/Gecko129/AirS
 - **macOS**:  
   Mount the `.dmg` and drag **AirShare.app** into `Applications`.  
 
+  ⚠️ On some macOS systems, the app may be flagged as "damaged" due to Gatekeeper quarantine.
+  If that happens, run the following command in Terminal to remove the quarantine flag:
+
+  ```bash
+  xattr -rd com.apple.quarantine /Applications/AirShare.app
+  ```
+
+  Then you can open the app normally.
+
 ---
 
 ##  Usage

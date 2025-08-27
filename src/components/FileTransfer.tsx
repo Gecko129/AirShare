@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Upload, X, File, Send, Users, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { stat } from '@tauri-apps/plugin-fs';
 import type { Device } from '../types/device';
 
 interface FileTransferProps {
@@ -142,15 +143,30 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     if (selected) {
       if (typeof selected === 'string') {
         console.log("File selezionato:", selected);
-        // crea un oggetto File simulato
-        setSelectedFile({
-          name: selected.split(/[\\/]/).pop() || 'file',
-          size: 0, // dimensione non nota
-          path: selected // aggiunta path per backend
-        } as any);
+        
+        try {
+          // Ottieni le informazioni del file usando stat
+          const fileInfo = await stat(selected);
+          
+          // Crea un oggetto File simulato con la dimensione reale
+          setSelectedFile({
+            name: selected.split(/[\\/]/).pop() || 'file',
+            size: fileInfo.size, // Ora abbiamo la dimensione reale in bytes
+            path: selected // aggiunta path per backend
+          } as any);
+        } catch (error) {
+          console.error("Errore nel leggere le informazioni del file:", error);
+          // Fallback con size 0 in caso di errore
+          setSelectedFile({
+            name: selected.split(/[\\/]/).pop() || 'file',
+            size: 0,
+            path: selected
+          } as any);
+        }
       }
     }
   };
+  
 
   const handleSend = async () => {
     if (!selectedFile || selectedDevices.length === 0) return;
