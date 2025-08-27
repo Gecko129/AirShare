@@ -71,9 +71,9 @@ function PaginationPrevious({
 }: React.ComponentProps<typeof PaginationLink>) {
   return (
     <PaginationLink
-      aria-label="Go to previous page"
-      size="default"
+      aria-label="Vai alla pagina precedente"
       className={cn("gap-1 px-2.5 sm:pl-2.5", className)}
+      size="default"
       {...props}
     >
       <ChevronLeftIcon />

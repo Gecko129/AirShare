@@ -263,7 +263,14 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           <div className="space-y-2">
             {selectedDevices.map(deviceId => (
               <div key={deviceId} className="flex items-center justify-between text-sm">
-                <span className="text-gray-300">{deviceNames[deviceId] ? deviceNames[deviceId] : deviceId}</span>
+                <span className="text-gray-300">
+                  {(() => {
+                    const ipOnly = deviceId.includes(':') ? deviceId.split(':')[0] : deviceId;
+                    const name = deviceNames[deviceId] ?? deviceNames[ipOnly];
+                    return name ? `${name} (${ipOnly})` : ipOnly;
+                  })()}
+                </span>
+
                 {isUploading && uploadProgress[deviceId] !== undefined && (
                   <div className="flex items-center gap-2">
                     <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
