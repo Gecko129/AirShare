@@ -35,6 +35,8 @@ struct DeviceEntry {
     last_seen_instant: Instant,
 }
 
+
+
 type SharedDevices = Arc<Mutex<Vec<DeviceEntry>>>;
 
 const BROADCAST_PORT: u16 = 40123;

@@ -19,6 +19,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [uploadETA, setUploadETA] = useState<Record<string, string>>({});
 
   const [deviceNames, setDeviceNames] = useState<Record<string, string>>({});
 
@@ -36,10 +37,19 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           const percent = typeof p.percent === 'number'
             ? Math.min(100, Math.max(0, Math.round(p.percent)))
             : p.total ? Math.round((p.sent / p.total) * 100) : 0;
+          
           setUploadProgress(prev => ({
             ...prev,
             [deviceKey]: percent,
           }));
+          
+          // Aggiorna ETA se disponibile
+          if (p.eta_formatted) {
+            setUploadETA(prev => ({
+              ...prev,
+              [deviceKey]: p.eta_formatted,
+            }));
+          }
         }
       });
 
@@ -51,6 +61,12 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             ...prev,
             [deviceKey]: 100,
           }));
+          // Rimuovi ETA quando il trasferimento è completato
+          setUploadETA(prev => {
+            const newETA = { ...prev };
+            delete newETA[deviceKey];
+            return newETA;
+          });
         }
       });
 
@@ -63,20 +79,45 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         console.log(`[backend][${level}]`, msg);
 
         // Esempi attesi:
-        // "send progress | id=... ip=1.2.3.4 port=40124 sent=123 total=456 percent=27.3"
+        // "send progress | id=... ip=1.2.3.4 port=40124 sent=123 total=456 percent=27.3 eta=1m 20s rimanenti"
         // "send complete | id=... ip=1.2.3.4 port=40124 path=/..."
-        // Parse progress
-        const progressMatch = msg.match(/^(send|recv) progress \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) (?:sent|received)=([0-9]+) total=([0-9]+) percent=([0-9.]+)/);
-        if (progressMatch) {
-          const direction = progressMatch[1];
-          const ip = progressMatch[3];
-          const port = progressMatch[4];
-          const percentStr = progressMatch[7];
+        // Parse progress con ETA opzionale
+        const progressMatchWithETA = msg.match(/^(send|recv) progress \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) (?:sent|received)=([0-9]+) total=([0-9]+) percent=([0-9.]+) eta=(.+)$/);
+        const progressMatchWithoutETA = msg.match(/^(send|recv) progress \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) (?:sent|received)=([0-9]+) total=([0-9]+) percent=([0-9.]+)$/);
+        
+        if (progressMatchWithETA) {
+          const direction = progressMatchWithETA[1];
+          const ip = progressMatchWithETA[3];
+          const port = progressMatchWithETA[4];
+          const percentStr = progressMatchWithETA[7];
+          const etaStr = progressMatchWithETA[8];
           const percentNum = Number.parseFloat(percentStr);
           if (direction === 'send' && ip && port && Number.isFinite(percentNum)) {
             const deviceKey = `${ip}:${port}`;
             const percent = Math.max(0, Math.min(100, Math.round(percentNum)));
             setUploadProgress(prev => ({ ...prev, [deviceKey]: percent }));
+            setUploadETA(prev => ({ ...prev, [deviceKey]: etaStr }));
+          }
+          return;
+        }
+        
+        if (progressMatchWithoutETA) {
+          const direction = progressMatchWithoutETA[1];
+          const ip = progressMatchWithoutETA[3];
+          const port = progressMatchWithoutETA[4];
+          const percentStr = progressMatchWithoutETA[7];
+          const percentNum = Number.parseFloat(percentStr);
+          if (direction === 'send' && ip && port && Number.isFinite(percentNum)) {
+            const deviceKey = `${ip}:${port}`;
+            const percent = Math.max(0, Math.min(100, Math.round(percentNum)));
+            setUploadProgress(prev => ({ ...prev, [deviceKey]: percent }));
+            // Mantieni ETA esistente se disponibile, altrimenti imposta "Calcolo ETA..."
+            setUploadETA(prev => {
+              if (prev[deviceKey] && prev[deviceKey] !== "Calcolo ETA...") {
+                return prev;
+              }
+              return { ...prev, [deviceKey]: "Calcolo ETA..." };
+            });
           }
           return;
         }
@@ -89,6 +130,12 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           if (ip && port) {
             const deviceKey = `${ip}:${port}`;
             setUploadProgress(prev => ({ ...prev, [deviceKey]: 100 }));
+            // Rimuovi ETA quando il trasferimento è completato
+            setUploadETA(prev => {
+              const newETA = { ...prev };
+              delete newETA[deviceKey];
+              return newETA;
+            });
           }
         }
       });
@@ -166,7 +213,6 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
       }
     }
   };
-  
 
   const handleSend = async () => {
     if (!selectedFile || selectedDevices.length === 0) return;
@@ -175,6 +221,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
 
     setIsUploading(true);
     setUploadProgress({});
+    setUploadETA({});
 
     // Per ora, placeholder per IP e porta; in futuro recupera dal deviceId.
     // Esempio: deviceId = "192.168.1.10:40124"
@@ -196,16 +243,21 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           ...prev,
           [deviceId]: 0
         }));
+        setUploadETA(prev => ({
+          ...prev,
+          [deviceId]: "Calcolo ETA..."
+        }));
 
         // Chiamata al backend Tauri
         // Nota: potremmo dover convertire il File in un path o usare FileReader per i dati
-        const invokeArgs = {
-          filePath: (selectedFile as any).path || selectedFile.name,
-          ip: targetIp,
-          port: targetPort
-        };
-        console.log("Chiamata invoke con argomenti:", invokeArgs);
-        await invoke('send_file', invokeArgs);
+        const filePath = (selectedFile as any).path || selectedFile.name;
+        console.log("Chiamata invoke con argomenti:", { filePath, ip: targetIp, port: targetPort });
+        // Passa i parametri come oggetto con nomi che corrispondono alla funzione Rust
+        await invoke('send_file', { 
+          ip: targetIp, 
+          port: targetPort, 
+          filePath: filePath 
+        });
 
         console.log("Invio completato per", deviceId);
       } catch (err) {
@@ -214,6 +266,10 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         setUploadProgress(prev => ({
           ...prev,
           [deviceId]: 0
+        }));
+        setUploadETA(prev => ({
+          ...prev,
+          [deviceId]: "Errore"
         }));
       }
     }
@@ -224,6 +280,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     setIsUploading(false);
     setSelectedFile(null);
     setUploadProgress({});
+    setUploadETA({});
     console.log("Invio terminato");
   };
 
@@ -261,29 +318,46 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             <span className="text-slate-200 text-sm">Invio a {selectedDevices.length} dispositivi:</span>
           </div>
           <div className="space-y-2">
-            {selectedDevices.map(deviceId => (
-              <div key={deviceId} className="flex items-center justify-between text-sm">
-                <span className="text-gray-300">
-                  {(() => {
-                    const ipOnly = deviceId.includes(':') ? deviceId.split(':')[0] : deviceId;
-                    const name = deviceNames[deviceId] ?? deviceNames[ipOnly];
-                    return name ? `${name} (${ipOnly})` : ipOnly;
-                  })()}
-                </span>
+          {selectedDevices.map(deviceId => {
+  const ipOnly = deviceId.includes(':') ? deviceId.split(':')[0] : deviceId;
+  const port = deviceId.includes(':') ? deviceId.split(':')[1] : "40124"; // porta di default, se manca
+  const key = `${ipOnly}:${port}`;
+  const name = deviceNames[deviceId] ?? deviceNames[ipOnly];
 
-                {isUploading && uploadProgress[deviceId] !== undefined && (
-                  <div className="flex items-center gap-2">
-                    <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-slate-400 transition-all duration-300"
-                        style={{ width: `${uploadProgress[deviceId]}%` }}
-                      />
-                    </div>
-                    <span className="text-gray-400 text-xs w-8">{uploadProgress[deviceId]}%</span>
-                  </div>
-                )}
-              </div>
-            ))}
+  return (
+    <div key={deviceId} className="flex items-center justify-between text-sm">
+      <span className="text-gray-300">
+        {name ? `${name} (${ipOnly})` : ipOnly}
+      </span>
+
+      {isUploading && uploadProgress[key] !== undefined && (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-slate-400 transition-all duration-300"
+                style={{ width: `${uploadProgress[key]}%` }}
+              />
+            </div>
+            <span className="text-gray-400 text-xs w-8">{uploadProgress[key]}%</span>
+          </div>
+          {uploadETA[key] && uploadETA[key] !== "Calcolo ETA..." && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/40">
+              <span className="text-slate-300 text-xs">⏱️</span>
+              <span className="text-slate-200 text-xs">{uploadETA[key]}</span>
+            </div>
+          )}
+          {uploadETA[key] === "Calcolo ETA..." && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-600/40 border border-slate-500/40">
+              <span className="text-slate-400 text-xs">⏳</span>
+              <span className="text-slate-300 text-xs">Calcolo ETA...</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+})}
           </div>
         </div>
       )}

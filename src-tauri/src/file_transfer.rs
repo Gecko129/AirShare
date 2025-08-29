@@ -30,6 +30,39 @@ pub struct FileInfo {
     pub is_file: bool,
 }
 
+/// Calcola l'ETA basandosi sulla velocità di trasferimento attuale
+fn calculate_eta(bytes_transferred: u64, total_bytes: u64, elapsed_ms: u128) -> (u128, String) {
+    if bytes_transferred == 0 || elapsed_ms == 0 {
+        return (0, "Calcolo ETA...".to_string());
+    }
+    
+    let bytes_remaining = total_bytes - bytes_transferred;
+    let bytes_per_ms = bytes_transferred as f64 / elapsed_ms as f64;
+    
+    if bytes_per_ms <= 0.0 {
+        return (0, "Calcolo ETA...".to_string());
+    }
+    
+    let eta_ms = (bytes_remaining as f64 / bytes_per_ms) as u128;
+    
+    // Formatta l'ETA in formato leggibile
+    let eta_formatted = if eta_ms < 1000 {
+        format!("{}ms rimanenti", eta_ms)
+    } else if eta_ms < 60000 {
+        format!("{:.0}s rimanenti", eta_ms as f64 / 1000.0)
+    } else if eta_ms < 3600000 {
+        let minutes = eta_ms / 60000;
+        let seconds = (eta_ms % 60000) / 1000;
+        format!("{}m {}s rimanenti", minutes, seconds)
+    } else {
+        let hours = eta_ms / 3600000;
+        let minutes = (eta_ms % 3600000) / 60000;
+        format!("{}h {}m rimanenti", hours, minutes)
+    };
+    
+    (eta_ms, eta_formatted)
+}
+
 /// Get file information for a given file path
 #[tauri::command]
 pub fn get_file_info(file_path: String) -> Result<FileInfo, String> {
@@ -215,11 +248,12 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                     return;
                 }
             };
-
+            
             // Receive exactly offer.file_size bytes
             let mut received: u64 = 0;
             let mut buffer = vec![0u8; 64 * 1024];
             let mut last_log = Instant::now();
+            let transfer_start = Instant::now();
             info!("({addr}) Beginning binary receive of {} bytes for transfer {}", offer.file_size, transfer_id);
             while received < offer.file_size {
                 let to_read = std::cmp::min(buffer.len() as u64, offer.file_size - received) as usize;
@@ -243,7 +277,12 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                     return;
                 }
                 received += n as u64;
-                // Emit progress
+                
+                // Calcola ETA per il progresso
+                let elapsed_ms = transfer_start.elapsed().as_millis();
+                let (eta_ms, eta_formatted) = calculate_eta(received, offer.file_size, elapsed_ms);
+                
+                // Emit progress con ETA
                 let progress = serde_json::json!({
                     "transfer_id": transfer_id,
                     "received": received,
@@ -251,29 +290,33 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                     "percent": (received as f64 / offer.file_size as f64) * 100.0,
                     "ip": addr.ip().to_string(),
                     "port": addr.port(),
-                    "direction": "receive"
+                    "direction": "receive",
+                    "eta_ms": eta_ms,
+                    "eta_formatted": eta_formatted
                 });
                 let _ = app_handle.emit("transfer_progress", progress);
                 info!("({addr}) Received {} / {} bytes", received, offer.file_size);
 
-                // Throttled log once per second for frontend debugging context
-                if last_log.elapsed().as_secs_f64() >= 1.0 {
-                    let percent = (received as f64 / offer.file_size as f64) * 100.0;
-                    info!(
-                        "recv progress | id={} ip={} port={} received={} total={} percent={:.1}",
-                        transfer_id,
-                        addr.ip(),
-                        addr.port(),
-                        received,
-                        offer.file_size,
-                        percent
-                    );
-                    tauri_log(&app_handle, "info", format!(
-                        "recv progress | id={} ip={} port={} received={} total={} percent={:.1}",
-                        transfer_id, addr.ip(), addr.port(), received, offer.file_size, percent
-                    )).await;
-                    last_log = Instant::now();
-                }
+                        // Throttled log once per second for frontend debugging context
+        if last_log.elapsed().as_secs_f64() >= 1.0 {
+            let percent = (received as f64 / offer.file_size as f64) * 100.0;
+            let (_, eta_formatted) = calculate_eta(received, offer.file_size, elapsed_ms);
+            info!(
+                "recv progress | id={} ip={} port={} received={} total={} percent={:.1} eta={}",
+                transfer_id,
+                addr.ip(),
+                addr.port(),
+                received,
+                offer.file_size,
+                percent,
+                eta_formatted
+            );
+            tauri_log(&app_handle, "info", format!(
+                "recv progress | id={} ip={} port={} received={} total={} percent={:.1} eta={}",
+                transfer_id, addr.ip(), addr.port(), received, offer.file_size, percent, eta_formatted
+            )).await;
+            last_log = Instant::now();
+        }
             }
 
             if let Err(e) = file.sync_all().await {
@@ -410,6 +453,7 @@ pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_h
     let mut sent: u64 = 0;
     let mut buffer = vec![0u8; 64 * 1024];
     let mut last_log = Instant::now();
+    let transfer_start = Instant::now();
     while sent < file_size {
         let to_read = std::cmp::min(buffer.len() as u64, file_size - sent) as usize;
         let n = match file.read(&mut buffer[..to_read]).await {
@@ -430,6 +474,10 @@ pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_h
         let progress_percentage = (sent as f64 / file_size as f64) * 100.0;
         let _ = app_handle.emit("file_progress", progress_percentage);
 
+        // Calcola ETA per il progresso
+        let elapsed_ms = transfer_start.elapsed().as_millis();
+        let (eta_ms, eta_formatted) = calculate_eta(sent, file_size, elapsed_ms);
+
         let progress = serde_json::json!({
             "transfer_id": transfer_id,
             "sent": sent,
@@ -437,30 +485,35 @@ pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_h
             "percent": progress_percentage,
             "ip": target_ip,
             "port": target_port,
-            "direction": "send"
+            "direction": "send",
+            "eta_ms": eta_ms,
+            "eta_formatted": eta_formatted
         });
         let _ = app_handle.emit("transfer_progress", progress);
         info!("Sent {} / {} bytes", sent, file_size);
 
         // Throttled log once per second for frontend debugging context
         if last_log.elapsed().as_secs_f64() >= 1.0 {
+            let (_, eta_formatted) = calculate_eta(sent, file_size, elapsed_ms);
             info!(
-                "send progress | id={} ip={} port={} sent={} total={} percent={:.1}",
+                "send progress | id={} ip={} port={} sent={} total={} percent={:.1} eta={}",
                 transfer_id,
                 addr.split(':').next().unwrap_or("") ,
                 addr.split(':').nth(1).unwrap_or("") ,
                 sent,
                 file_size,
-                progress_percentage
+                progress_percentage,
+                eta_formatted
             );
             tauri_log(&app_handle, "info", format!(
-                "send progress | id={} ip={} port={} sent={} total={} percent={:.1}",
+                "send progress | id={} ip={} port={} sent={} total={} percent={:.1} eta={}",
                 transfer_id,
                 addr.split(':').next().unwrap_or(""),
                 addr.split(':').nth(1).unwrap_or(""),
                 sent,
                 file_size,
-                progress_percentage
+                progress_percentage,
+                eta_formatted
             )).await;
             last_log = Instant::now();
         }
