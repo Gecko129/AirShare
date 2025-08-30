@@ -21,7 +21,9 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [uploadETA, setUploadETA] = useState<Record<string, string>>({});
 
-  const [deviceNames, setDeviceNames] = useState<Record<string, string>>({});
+  // const [deviceNames, setDeviceNames] = useState<Record<string, string>>({});
+  // Stato per la lista di tutti i dispositivi ricevuti dal backend
+  const [allDevices, setAllDevices] = useState<Device[]>([]);
 
   // Ascolta gli eventi di progresso/completamento dal backend (solo invio)
   useEffect(() => {
@@ -148,20 +150,16 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     };
   }, []);
 
-  // Aggiorna deviceNames quando onDevicesUpdate viene chiamato dal componente padre
-    useEffect(() => {
-        if (!onDevicesUpdate) return;
-        // Qui aggiorniamo i nomi dei device tramite callback fornita dal padre
-        const updateNames = (devices: Device[]) => {
-          const names: Record<string, string> = {};
-          devices.forEach(device => {
-            names[device.id] = device.name;
-          });
-          setDeviceNames(names);
-        };
-        // Fornisci la funzione updateNames come callback al parent
-        onDevicesUpdate(updateNames);
-      }, [onDevicesUpdate]);
+  // Aggiorna allDevices quando onDevicesUpdate viene chiamato dal componente padre
+  useEffect(() => {
+    if (!onDevicesUpdate) return;
+    // Qui aggiorniamo i device tramite callback fornita dal padre
+    const updateNames = (devices: Device[]) => {
+      setAllDevices(devices); // Salva anche tutti i device per lookup completo
+    };
+    // Fornisci la funzione updateNames come callback al parent
+    onDevicesUpdate(updateNames);
+  }, [onDevicesUpdate]);
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -318,46 +316,44 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             <span className="text-slate-200 text-sm">Invio a {selectedDevices.length} dispositivi:</span>
           </div>
           <div className="space-y-2">
-          {selectedDevices.map(deviceId => {
-  const ipOnly = deviceId.includes(':') ? deviceId.split(':')[0] : deviceId;
-  const port = deviceId.includes(':') ? deviceId.split(':')[1] : "40124"; // porta di default, se manca
-  const key = `${ipOnly}:${port}`;
-  const name = deviceNames[deviceId] ?? deviceNames[ipOnly];
+            {selectedDevices.map(deviceId => {
+              const device = allDevices.find(d => d.id === deviceId) ?? { name: "Dispositivo", ip: deviceId };
+              const deviceTyped = device as Device & { ip: string; port?: number };
+              const key = `${deviceTyped.ip}:${deviceTyped.port ?? 40124}`;
+              const name = deviceTyped.name ?? "Dispositivo";
+              const ip = deviceTyped.ip;
 
-  return (
-    <div key={deviceId} className="flex items-center justify-between text-sm">
-      <span className="text-gray-300">
-        {name ? `${name} (${ipOnly})` : ipOnly}
-      </span>
-
-      {isUploading && uploadProgress[key] !== undefined && (
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-slate-400 transition-all duration-300"
-                style={{ width: `${uploadProgress[key]}%` }}
-              />
-            </div>
-            <span className="text-gray-400 text-xs w-8">{uploadProgress[key]}%</span>
-          </div>
-          {uploadETA[key] && uploadETA[key] !== "Calcolo ETA..." && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/40">
-              <span className="text-slate-300 text-xs">⏱️</span>
-              <span className="text-slate-200 text-xs">{uploadETA[key]}</span>
-            </div>
-          )}
-          {uploadETA[key] === "Calcolo ETA..." && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-600/40 border border-slate-500/40">
-              <span className="text-slate-400 text-xs">⏳</span>
-              <span className="text-slate-300 text-xs">Calcolo ETA...</span>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-})}
+              return (
+                <div key={deviceId} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-300">{`${name} (${ip})`}</span>
+                  {isUploading && uploadProgress[key] !== undefined && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-slate-400 transition-all duration-300"
+                            style={{ width: `${uploadProgress[key]}%` }}
+                          />
+                        </div>
+                        <span className="text-gray-400 text-xs w-8">{uploadProgress[key]}%</span>
+                      </div>
+                      {uploadETA[key] && uploadETA[key] !== "Calcolo ETA..." && (
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/40">
+                          <span className="text-slate-300 text-xs">⏱️</span>
+                          <span className="text-slate-200 text-xs">{uploadETA[key]}</span>
+                        </div>
+                      )}
+                      {uploadETA[key] === "Calcolo ETA..." && (
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-600/40 border border-slate-500/40">
+                          <span className="text-slate-400 text-xs">⏳</span>
+                          <span className="text-slate-300 text-xs">Calcolo ETA...</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

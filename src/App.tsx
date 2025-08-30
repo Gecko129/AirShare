@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DeviceList } from './components/DeviceList';
 import { FileTransfer } from './components/FileTransfer';
 import { Waves, Zap } from 'lucide-react';
+import { TransferPrompt } from './components/TransferPrompt';
 
 export default function App() {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
@@ -110,6 +111,7 @@ export default function App() {
           </div>
         </div>
       </div>
+      <TransferPrompt />
     </div>
   );
 }

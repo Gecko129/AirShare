@@ -1,4 +1,5 @@
 use tauri::Emitter;
+use tauri_plugin_dialog::FileDialogBuilder;
 use tokio::{
     net::{TcpListener, TcpStream},
     io::{AsyncReadExt, AsyncWriteExt},
@@ -10,7 +11,20 @@ use log::{info, error, warn};
 use tokio::fs;
 use tokio::time::{timeout, Duration};
 use std::time::Instant;
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri_plugin_dialog::DialogExt;
+use std::collections::HashMap;
+use once_cell::sync::Lazy;
+use tokio::sync::Mutex as TokioMutex;
+
+// Global shared state for transfer responses
+static TRANSFER_RESPONSES: Lazy<TokioMutex<HashMap<String, bool>>> = Lazy::new(|| TokioMutex::new(HashMap::new()));
+/// Respond to a transfer request from the frontend.
+#[allow(dead_code)]
+#[tauri::command]
+pub async fn respond_transfer(transfer_id: String, accept: bool) {
+    let mut map = TRANSFER_RESPONSES.lock().await;
+    map.insert(transfer_id, accept);
+}
 use dirs;
 use tauri::AppHandle;
 
@@ -201,14 +215,26 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 }),
             );
 
-            // For now, auto-accept
-            let accept = true;
-
+            // Attendi risposta dal frontend tramite mappa condivisa
+            let accept = loop {
+                {
+                    let map = TRANSFER_RESPONSES.lock().await;
+                    if let Some(&accept) = map.get(&transfer_id) {
+                        break accept;
+                    }
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            };
+            // Rimuovi la decisione dalla mappa per evitare leak
+            {
+                let mut map = TRANSFER_RESPONSES.lock().await;
+                map.remove(&transfer_id);
+            }
             // Send ack JSON (expanded for potential error reporting)
             let ack = if accept {
                 serde_json::json!({ "accept": true })
             } else {
-                serde_json::json!({ "accept": false })
+                serde_json::json!({ "accept": false, "error": "user_rejected" })
             };
             let ack_str = serde_json::to_string(&ack).unwrap() + "\n";
             match socket.write_all(ack_str.as_bytes()).await {
@@ -227,18 +253,56 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 }
             }
             if !accept {
-                info!("({addr}) Transfer rejected by server policy.");
+                info!("({addr}) Transfer rejected by user.");
                 return;
             }
 
-            // Create temp file
-            let mut documents_dir = dirs::document_dir().unwrap_or(std::env::temp_dir());
-            documents_dir.push("AirShare");
-            if let Err(e) = tokio::fs::create_dir_all(&documents_dir).await {
-                error!("Failed to create AirShare directory: {}", e);
+            // Chiedi cartella di destinazione all'utente
+            use std::sync::Arc;
+            use tokio::sync::Mutex;
+
+            let save_dir_result: Arc<Mutex<Option<PathBuf>>> = Arc::new(Mutex::new(None));
+            let save_dir_clone = save_dir_result.clone();
+
+            // Usa il dialog asincrono con callback
+            FileDialogBuilder::new(app_handle.dialog().clone())
+                .set_title("Scegli la cartella di destinazione per il file")
+                .pick_folder(move |path| {
+                    let save_dir_clone = save_dir_clone.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let mut result = save_dir_clone.lock().await;
+                        *result = path.and_then(|p| p.as_path().map(|path| PathBuf::from(path)));
+                    });
+                });
+            
+            // Aspetta che l'utente selezioni una cartella (con timeout)
+            let save_dir = loop {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                let result = save_dir_result.lock().await;
+                if result.is_some() {
+                    break result.clone();
+                }
+                // Implementa un timeout se necessario
+            };
+            
+            let save_dir = match save_dir {
+                Some(path) => path,
+                None => {
+                    info!("({addr}) Trasferimento annullato dall'utente.");
+                    let _ = app_handle.emit("transfer_rejected", serde_json::json!({
+                        "transfer_id": transfer_id,
+                        "reason": "user_cancelled"
+                    }));
+                    return;
+                }
+            };
+
+            let temp_path = save_dir.join(&offer.file_name);
+            if let Err(e) = tokio::fs::create_dir_all(&save_dir).await {
+                error!("({addr}) Failed to create selected directory: {}", e);
+                tauri_log(&app_handle, "error", format!("Failed to create selected directory {}: {}", save_dir.display(), e)).await;
                 return;
             }
-            let temp_path = documents_dir.join(&offer.file_name);
             info!("({addr}) Creating destination file at {:?}", temp_path);
             let mut file = match fs::File::create(&temp_path).await {
                 Ok(f) => f,
@@ -297,34 +361,34 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 let _ = app_handle.emit("transfer_progress", progress);
                 info!("({addr}) Received {} / {} bytes", received, offer.file_size);
 
-                        // Throttled log once per second for frontend debugging context
-        if last_log.elapsed().as_secs_f64() >= 1.0 {
-            let percent = (received as f64 / offer.file_size as f64) * 100.0;
-            let (_, eta_formatted) = calculate_eta(received, offer.file_size, elapsed_ms);
-            info!(
-                "recv progress | id={} ip={} port={} received={} total={} percent={:.1} eta={}",
-                transfer_id,
-                addr.ip(),
-                addr.port(),
-                received,
-                offer.file_size,
-                percent,
-                eta_formatted
-            );
-            tauri_log(&app_handle, "info", format!(
-                "recv progress | id={} ip={} port={} received={} total={} percent={:.1} eta={}",
-                transfer_id, addr.ip(), addr.port(), received, offer.file_size, percent, eta_formatted
-            )).await;
-            last_log = Instant::now();
-        }
+                // Throttled log once per second for frontend debugging context
+                if last_log.elapsed().as_secs_f64() >= 1.0 {
+                    let percent = (received as f64 / offer.file_size as f64) * 100.0;
+                    let (_, eta_formatted) = calculate_eta(received, offer.file_size, elapsed_ms);
+                    info!(
+                        "recv progress | id={} ip={} port={} received={} total={} percent={:.1} eta={}",
+                        transfer_id,
+                        addr.ip(),
+                        addr.port(),
+                        received,
+                        offer.file_size,
+                        percent,
+                        eta_formatted
+                    );
+                    tauri_log(&app_handle, "info", format!(
+                        "recv progress | id={} ip={} port={} received={} total={} percent={:.1} eta={}",
+                        transfer_id, addr.ip(), addr.port(), received, offer.file_size, percent, eta_formatted
+                    )).await;
+                    last_log = Instant::now();
+                }
             }
 
             if let Err(e) = file.sync_all().await {
                 warn!("({addr}) Failed to fsync file {:?}: {}", temp_path, e);
             }
 
-            app_handle.dialog().message(format!("File '{}' salvato in '{}'", offer.file_name, temp_path.display()))
-                .title("AirShare")
+            app_handle.dialog().message(format!("✅ File '{}' ricevuto correttamente in '{}'", offer.file_name, save_dir.display()))
+                .title("AirShare - Trasferimento completato")
                 .kind(tauri_plugin_dialog::MessageDialogKind::Info)
                 .show(|_| {});
 
@@ -543,7 +607,23 @@ pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_h
         "port": target_port,
         "direction": "send"
     }));
-    info!("File send complete: {:?}", path);
-    tauri_log(&app_handle, "info", format!("send complete | id={} ip={} port={} path={}", transfer_id, addr.split(':').next().unwrap_or(""), addr.split(':').nth(1).unwrap_or(""), path.display())).await;
+    info!("Invio del file completato: {:?}", path);
+    tauri_log(
+        &app_handle,
+        "info",
+        format!(
+            "invio completato | id={} ip={} port={} percorso={}",
+            transfer_id,
+            addr.split(':').next().unwrap_or(""),
+            addr.split(':').nth(1).unwrap_or(""),
+            path.display()
+        )
+    ).await;
+    // Mostra una finestra di dialogo come per la ricezione
+    let device_name = gethostname::gethostname().to_string_lossy().to_string();
+    app_handle.dialog().message(format!("✅ File '{}' inviato correttamente a {} ({})", file_name, device_name, target_ip))
+        .title("AirShare - Trasferimento completato")
+        .kind(tauri_plugin_dialog::MessageDialogKind::Info)
+        .show(|_| {});
     Ok(())
 }

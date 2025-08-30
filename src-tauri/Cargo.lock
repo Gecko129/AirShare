@@ -18,6 +18,7 @@ dependencies = [
  "log",
  "mdns",
  "mime_guess",
+ "once_cell",
  "serde",
  "serde_json",
  "tauri",
