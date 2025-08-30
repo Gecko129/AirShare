@@ -4,6 +4,7 @@ import { Card } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Wifi, Smartphone, Laptop, Monitor, Router, Zap } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { useTranslation } from "react-i18next";
 
 interface Device {
   id: string;
@@ -58,6 +59,7 @@ const guessDeviceType = (name: string): Device['type'] => {
 };
 
 export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListProps) {
+  const { t } = useTranslation();
   const [devices, setDevices] = useState<Device[]>([]);
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
 
@@ -172,8 +174,8 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
             <Zap className="w-6 h-6 text-gray-200" />
           </div>
           <div>
-            <h2 className="text-gray-100">Dispositivi Rilevati</h2>
-            <p className="text-gray-400 text-sm">{airshareDevices.length} dispositivi disponibili</p>
+            <h2 className="text-gray-100">{t("detected_devices")}</h2>
+            <p className="text-gray-400 text-sm">{t("available_devices", { count: airshareDevices.length })}</p>
           </div>
         </div>
 
@@ -183,7 +185,7 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
             className="px-3 py-1 rounded-lg bg-gray-800/60 text-gray-300 hover:bg-gray-700/80 transition-colors text-sm border border-gray-600/40 flex-shrink-0"
             type="button"
           >
-            {selectedDevices.length === airshareDevices.length ? 'Deseleziona tutti' : 'Seleziona tutti'}
+            {selectedDevices.length === airshareDevices.length ? t("deselect_all") : t("select_all")}
           </button>
         )}
       </div>
@@ -193,8 +195,8 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
           <div className="p-4 rounded-full bg-gray-800/30 w-fit mx-auto mb-4">
             <Zap className="w-8 h-8 text-gray-500" />
           </div>
-          <p className="text-gray-400">Nessun dispositivo rilevato</p>
-          <p className="text-gray-500 text-sm mt-1">Scansione della rete in corso...</p>
+          <p className="text-gray-400">{t("no_devices_found")}</p>
+          <p className="text-gray-500 text-sm mt-1">{t("scanning_network")}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -238,11 +240,11 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
                         ? 'bg-green-500/20 text-green-200 border-green-500/40'
                         : 'bg-gray-500/20 text-gray-200 border-gray-500/40'
                     } text-xs whitespace-nowrap`}>
-                      {device.status === 'online' ? 'Online' : 'Offline'}
+                      {device.status === 'online' ? t("online") : t("offline")}
                     </Badge>
                     <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/40">
                       <Zap className="w-3 h-3 text-slate-300" />
-                      <span className="text-slate-200 text-xs">Rilevato</span>
+                      <span className="text-slate-200 text-xs">{t("detected_badge")}</span>
                     </div>
                   </div>
 
@@ -260,11 +262,11 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
                 <div className="mt-6 pt-4 border-t border-gray-700/40">
                   <div className="grid grid-cols-2 gap-6 text-sm">
                     <div>
-                      <span className="text-gray-500">MAC:</span>
+                      <span className="text-gray-500">{t("mac_label")}</span>
                       <span className="text-gray-400 ml-2 break-all">{device.mac}</span>
                     </div>
                     <div>
-                      <span className="text-gray-500">Versione:</span>
+                      <span className="text-gray-500">{t("version_label")}</span>
                       <span className="text-gray-400 ml-2">v{device.version}</span>
                     </div>
                   </div>

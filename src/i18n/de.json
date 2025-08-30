@@ -1,0 +1,32 @@
+
+
+{
+  "transfer_request_title": "Übertragungsanforderung",
+  "transfer_request_description": "{{device}} möchte Ihnen die Datei '{{file}}' senden ({{size}})",
+  "accept": "Akzeptieren",
+  "reject": "Ablehnen",
+  "file_transfer_title": "Dateiübertragung",
+  "file_transfer_description": "Wählen Sie eine Datei zum Teilen aus",
+  "sending_to_devices": "Senden an {{count}} Geräte:",
+  "drop_file_text": "Ziehen Sie eine Datei hierher oder klicken Sie, um sie auszuwählen",
+  "drop_file_subtext": "Jede Art von Datei wird unterstützt",
+  "no_device_selected": "Wählen Sie mindestens ein Gerät aus, um die Datei zu senden",
+  "uploading": "Senden...",
+  "send_button_text": "An {{count}} Geräte senden",
+  "detected_devices": "Erkannte Geräte",
+  "available_devices": "{{count}} Geräte verfügbar",
+  "no_devices_found": "Keine Geräte gefunden",
+  "scanning_network": "Netzwerkscan läuft...",
+  "select_all": "Alle auswählen",
+  "deselect_all": "Alle abwählen",
+  "detected_badge": "Erkannt",
+  "online": "Online",
+  "offline": "Offline",
+  "mac_label": "MAC:",
+  "version_label": "Version:",
+  "app_subtitle": "Teilen Sie Dateien sofort zwischen Geräten in Ihrem Netzwerk",
+  "listening_devices": "Auf AirShare-Geräte hören",
+  "airshare_active": "AirShare aktiv",
+  "devices_selected": "{{count}} Geräte ausgewählt",
+  "scanning_interval": "Scan alle 3s"
+}

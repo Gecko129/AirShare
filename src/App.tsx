@@ -1,11 +1,16 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { DeviceList } from './components/DeviceList';
 import { FileTransfer } from './components/FileTransfer';
 import { Waves, Zap } from 'lucide-react';
 import { TransferPrompt } from './components/TransferPrompt';
+import LanguageSwitcher from './components/LanguageSwitcher';
+import './i18n';
 
 export default function App() {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+
+  const { t } = useTranslation();
 
   const handleDeviceSelectionChange = (deviceIds: string[]) => {
     setSelectedDevices(deviceIds);
@@ -65,13 +70,13 @@ export default function App() {
             </div>
             <div className="text-left">
               <h1 className="text-4xl text-gray-100 mb-2">AirShare</h1>
-              <p className="text-gray-400 text-lg">Condividi file istantaneamente tra dispositivi nella tua rete</p>
+              <p className="text-gray-400 text-lg">{t("app_subtitle")}</p>
             </div>
           </div>
           
           <div className="flex items-center justify-center gap-2 text-gray-500">
             <Waves className="w-5 h-5 animate-pulse" />
-            <span>In ascolto per dispositivi AirShare</span>
+            <span>{t("listening_devices")}</span>
           </div>
         </div>
 
@@ -98,20 +103,24 @@ export default function App() {
           <div className="inline-flex items-center gap-6 px-6 py-3 rounded-full backdrop-blur-md bg-gray-900/60 border border-gray-700/40">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-gray-400 text-sm">AirShare attivo</span>
+              <span className="text-gray-400 text-sm">{t("airshare_active")}</span>
             </div>
             <div className="w-px h-4 bg-gray-700/60" />
             <div className="flex items-center gap-2">
-              <span className="text-gray-400 text-sm">{selectedDevices.length} dispositivi selezionati</span>
+              <span className="text-gray-400 text-sm">{t("devices_selected", { count: selectedDevices.length })}</span>
             </div>
             <div className="w-px h-4 bg-gray-700/60" />
             <div className="flex items-center gap-2">
-              <span className="text-gray-400 text-sm">Scansione ogni 3s</span>
+              <span className="text-gray-400 text-sm">{t("scanning_interval")}</span>
             </div>
           </div>
         </div>
       </div>
       <TransferPrompt />
+      {/* Language Switcher - fixed bottom left */}
+      <div className="fixed bottom-4 left-4 z-50">
+        <LanguageSwitcher />
+      </div>
     </div>
   );
 }

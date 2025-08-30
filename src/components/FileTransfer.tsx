@@ -8,6 +8,7 @@ import { Upload, X, File, Send, Users, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 // usa il backend Tauri get_file_info invece del plugin-fs
 import type { Device } from '../types/device';
+import { useTranslation } from "react-i18next";
 
 interface FileTransferProps {
   selectedDevices: string[];
@@ -15,6 +16,7 @@ interface FileTransferProps {
 }
 
 export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferProps) {
+  const { t } = useTranslation();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -303,8 +305,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           <Upload className="w-6 h-6 text-gray-200" />
         </div>
         <div>
-          <h2 className="text-gray-100">Trasferimento File</h2>
-          <p className="text-gray-400 text-sm">Seleziona un file da condividere</p>
+          <h2 className="text-gray-100">{t("file_transfer_title")}</h2>
+          <p className="text-gray-400 text-sm">{t("file_transfer_description")}</p>
         </div>
       </div>
 
@@ -313,7 +315,9 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         <div className="mb-6 p-4 rounded-lg bg-slate-800/30 border border-slate-700/40">
           <div className="flex items-center gap-2 mb-3">
             <Users className="w-4 h-4 text-slate-300" />
-            <span className="text-slate-200 text-sm">Invio a {selectedDevices.length} dispositivi:</span>
+            <span className="text-slate-200 text-sm">
+              {t("sending_to_devices", { count: selectedDevices.length })}
+            </span>
           </div>
           <div className="space-y-2">
             {selectedDevices.map(deviceId => {
@@ -346,7 +350,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                       {uploadETA[key] === "Calcolo ETA..." && (
                         <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-600/40 border border-slate-500/40">
                           <span className="text-slate-400 text-xs">⏳</span>
-                          <span className="text-slate-300 text-xs">Calcolo ETA...</span>
+                          <span className="text-slate-300 text-xs">{t("calculating_eta")}</span>
                         </div>
                       )}
                     </div>
@@ -383,8 +387,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                 <Upload className="w-8 h-8 text-gray-400" />
               </div>
               <div>
-                <p className="text-gray-200">Trascina un file qui o clicca per selezionarlo</p>
-                <p className="text-gray-500 text-sm mt-1">Qualsiasi tipo di file è supportato</p>
+                <p className="text-gray-200">{t("drop_file_text")}</p>
+                <p className="text-gray-500 text-sm mt-1">{t("drop_file_subtext")}</p>
               </div>
             </motion.div>
           ) : (
@@ -423,7 +427,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
       {selectedFile && selectedDevices.length === 0 && (
         <div className="mt-4 p-3 rounded-lg bg-orange-900/40 border border-orange-700/40 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-orange-400" />
-          <span className="text-orange-300 text-sm">Seleziona almeno un dispositivo per inviare il file</span>
+          <span className="text-orange-300 text-sm">{t("no_device_selected")}</span>
         </div>
       )}
 
@@ -445,7 +449,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                 className="flex items-center gap-2"
               >
                 <div className="w-4 h-4 border-2 border-gray-400/40 border-t-gray-200 rounded-full animate-spin" />
-                Invio in corso...
+                {t("uploading")}
               </motion.div>
             ) : (
               <motion.div
@@ -456,7 +460,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                 className="flex items-center gap-2"
               >
                 <Send className="w-4 h-4" />
-                Invia a {selectedDevices.length} dispositivi
+                {t("send_button_text", { count: selectedDevices.length })}
               </motion.div>
             )}
           </AnimatePresence>

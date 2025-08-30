@@ -11,10 +11,12 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "./ui/alert-dialog";
+import { useTranslation } from "react-i18next";
 
 export function TransferPrompt() {
   const [open, setOpen] = useState(false);
   const [transfer, setTransfer] = useState<any>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const unlistenPromise = listen("transfer_request", (event) => {
@@ -47,7 +49,6 @@ export function TransferPrompt() {
     return `${gb.toFixed(2)} GB`;
   }
 
-  // Tema scuro: override degli stili della modale
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogContent
@@ -60,17 +61,14 @@ export function TransferPrompt() {
       >
         <AlertDialogHeader>
           <AlertDialogTitle style={{ color: "#fafafa" }}>
-            Richiesta di trasferimento
+            {t("transfer_request_title")}
           </AlertDialogTitle>
           <AlertDialogDescription style={{ color: "#d4d4d8" }}>
-            <b style={{ color: "#fbbf24" }}>
-              {transfer?.device_name || "Dispositivo"}
-            </b>{" "}
-            ({transfer?.ip}) vuole inviarti il file{" "}
-            <b style={{ color: "#38bdf8" }}>{transfer?.offer?.file_name}</b>{" "}
-            (
-            {formatFileSize(transfer?.offer?.file_size || 0)}
-            )
+            {t("transfer_request_description", {
+              device: transfer?.device_name || "Dispositivo",
+              file: transfer?.offer?.file_name,
+              size: formatFileSize(transfer?.offer?.file_size || 0),
+            })}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -82,7 +80,7 @@ export function TransferPrompt() {
               border: "1px solid #3f3f46",
             }}
           >
-            Rifiuta
+            {t("reject")}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={() => handleResponse(true)}
@@ -92,7 +90,7 @@ export function TransferPrompt() {
               border: "1px solid #1d4ed8",
             }}
           >
-            Accetta
+            {t("accept")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
