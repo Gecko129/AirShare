@@ -90,7 +90,7 @@ async fn main() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_devices, send_file, file_transfer::get_file_info])
+        .invoke_handler(tauri::generate_handler![get_devices, send_file, send_file_with_progress, file_transfer::get_file_info])
         .run(tauri::generate_context!())
         .expect("error running tauri app");
 }
@@ -111,25 +111,11 @@ async fn udp_broadcast_heartbeat_loop() {
     let socket = TokioUdpSocket::bind(("0.0.0.0", 0)).await.expect("bind failed");
     socket.set_broadcast(true).expect("set broadcast failed");
     let broadcast_addr = SocketAddr::from(([255,255,255,255], BROADCAST_PORT));
-    info!("Starting UDP broadcast loop on port {} with device: {} ({})", BROADCAST_PORT, device.name, device.ip);
-    
     loop {
         let mut to_send = device.clone();
         to_send.last_seen = Utc::now().to_rfc3339();
         let json = serde_json::to_string(&to_send).unwrap();
-        match socket.send_to(json.as_bytes(), &broadcast_addr).await {
-            Ok(_) => {
-                // Log solo ogni 10 heartbeat per non riempire i log
-                static mut COUNTER: u64 = 0;
-                unsafe {
-                    COUNTER += 1;
-                    if COUNTER % 10 == 0 {
-                        info!("Broadcasted heartbeat #{} to {}:{}", COUNTER, broadcast_addr.ip(), broadcast_addr.port());
-                    }
-                }
-            }
-            Err(e) => error!("Failed to broadcast heartbeat: {}", e),
-        }
+        let _ = socket.send_to(json.as_bytes(), &broadcast_addr).await;
         time::sleep(Duration::from_secs(HEARTBEAT_INTERVAL_SECS)).await;
     }
 }
@@ -154,7 +140,6 @@ async fn udp_listener_loop(devices: SharedDevices) {
         match get_local_ip() {
             Some(local_ip) => {
                 if dev.ip == local_ip {
-                    info!("Ignoring own heartbeat from {}", local_ip);
                     continue;
                 }
             }
@@ -162,21 +147,16 @@ async fn udp_listener_loop(devices: SharedDevices) {
                 warn!("Failed to get local IP");
             }
         }
-        
-        info!("Received device heartbeat: {} ({}) from {}", dev.name, dev.ip, addr);
-        
         let now = Instant::now();
         let mut devs = devices.lock().unwrap();
         if let Some(existing) = devs.iter_mut().find(|d| d.device.ip == dev.ip) {
             existing.device = dev.clone();
             existing.last_seen_instant = now;
-            info!("Updated existing device: {} ({})", dev.name, dev.ip);
         } else {
             devs.push(DeviceEntry {
                 device: dev.clone(),
                 last_seen_instant: now,
             });
-            info!("Added new device: {} ({})", dev.name, dev.ip);
         }
     }
 }
@@ -195,18 +175,44 @@ async fn cleanup_loop(devices: SharedDevices) {
 #[tauri::command]
 fn get_devices(devices: tauri::State<'_, SharedDevices>) -> Vec<Device> {
     let devs = devices.lock().unwrap();
-    let device_list: Vec<Device> = devs.iter().map(|entry| entry.device.clone()).collect();
-    info!("Frontend requested devices, returning {} devices", device_list.len());
-    for device in &device_list {
-        info!("  - {} ({})", device.name, device.ip);
-    }
-    device_list
+    devs.iter().map(|entry| entry.device.clone()).collect()
 }
 
 #[tauri::command]
 async fn send_file(app_handle: tauri::AppHandle, ip: String, port: u16, file_path: String) -> Result<String, String> {
     let path = std::path::PathBuf::from(file_path);
     match file_transfer::send_file(ip, port, path, app_handle).await {
+        Ok(_) => Ok("File inviato con successo".into()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+// Global state for tracking overall transfer progress
+static OVERALL_SENT: once_cell::sync::Lazy<std::sync::Arc<tokio::sync::Mutex<u64>>> = 
+    once_cell::sync::Lazy::new(|| std::sync::Arc::new(tokio::sync::Mutex::new(0)));
+
+#[tauri::command]
+async fn send_file_with_progress(
+    app_handle: tauri::AppHandle, 
+    ip: String, 
+    port: u16, 
+    path: String,
+    file_index: Option<usize>,
+    total_files: Option<usize>,
+    file_name: Option<String>,
+    total_size: Option<u64>
+) -> Result<String, String> {
+    let path_buf = std::path::PathBuf::from(path);
+    
+    // If this is the first file, reset the overall progress
+    if let Some(index) = file_index {
+        if index == 0 {
+            let mut sent = OVERALL_SENT.lock().await;
+            *sent = 0;
+        }
+    }
+    
+    match file_transfer::send_file_with_progress(ip, port, path_buf, app_handle, file_index, total_files, file_name, Some(OVERALL_SENT.clone()), total_size).await {
         Ok(_) => Ok("File inviato con successo".into()),
         Err(e) => Err(e.to_string()),
     }

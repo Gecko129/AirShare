@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -31,10 +31,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [uploadETA, setUploadETA] = useState<Record<string, string>>({});
 
-  // Avanzamento per-file per ogni dispositivo: deviceKey -> fileIndex -> stato/percentuale
-  const [fileProgress, setFileProgress] = useState<Record<string, Record<number, { percent: number; eta?: string; status: 'queued' | 'uploading' | 'done' | 'error' }>>>({});
-  // Indice del file attualmente in upload per device (mutabile senza triggerare re-render a ogni tick)
-  const currentFileIndexRef = useRef<Record<string, number>>({});
+  // Progresso generale per dispositivo (semplificato)
+  const [generalProgress, setGeneralProgress] = useState<Record<string, { percent: number; eta?: string; currentFile?: string; totalFiles: number; completedFiles: number }>>({});
 
   // const [deviceNames, setDeviceNames] = useState<Record<string, string>>({});
   // Stato per la lista di tutti i dispositivi ricevuti dal backend
@@ -67,16 +65,6 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
               [deviceKey]: p.eta_formatted,
             }));
           }
-
-          // Aggiorna anche il progresso per-file corrente di questo device
-          const idx = currentFileIndexRef.current[deviceKey];
-          if (typeof idx === 'number') {
-            setFileProgress(prev => {
-              const deviceMap = { ...(prev[deviceKey] || {}) };
-              deviceMap[idx] = { percent, eta: p.eta_formatted, status: 'uploading' };
-              return { ...prev, [deviceKey]: deviceMap };
-            });
-          }
         }
       });
 
@@ -95,16 +83,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             return newETA;
           });
 
-          // Marca il file corrente come completato a 100%
-          const idx = currentFileIndexRef.current[deviceKey];
-          if (typeof idx === 'number') {
-            setFileProgress(prev => {
-              const deviceMap = { ...(prev[deviceKey] || {}) };
-              const existing = deviceMap[idx] || { percent: 0, status: 'uploading' as const };
-              deviceMap[idx] = { ...existing, percent: 100, eta: undefined, status: 'done' };
-              return { ...prev, [deviceKey]: deviceMap };
-            });
-          }
+          // Il progresso generale viene gestito dai log del backend
         }
       });
 
@@ -116,41 +95,105 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         // eslint-disable-next-line no-console
         console.log(`[backend][${level}]`, msg);
 
-        // Esempi attesi:
-        // "send progress | id=... ip=1.2.3.4 port=40123 sent=123 total=456 percent=27.3 eta=1m 20s rimanenti"
-        // "send complete | id=... ip=1.2.3.4 port=40123 path=/..."
-        // Parse progress con ETA opzionale
-        const progressMatchWithETA = msg.match(/^(send|recv) progress \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) (?:sent|received)=([0-9]+) total=([0-9]+) percent=([0-9.]+) eta=(.+)$/);
-        const progressMatchWithoutETA = msg.match(/^(send|recv) progress \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) (?:sent|received)=([0-9]+) total=([0-9]+) percent=([0-9.]+)$/);
-        
-        if (progressMatchWithETA) {
-          const direction = progressMatchWithETA[1];
-          const ip = progressMatchWithETA[3];
-          const port = progressMatchWithETA[4];
-          const percentStr = progressMatchWithETA[7];
-          const etaStr = progressMatchWithETA[8];
-          const percentNum = Number.parseFloat(percentStr);
-          if (direction === 'send' && ip && port && Number.isFinite(percentNum)) {
+                 // Robust regex for progress parsing (with named groups), handles percent and eta, skips truncated lines.
+         // Truncated lines (with …) are ignored.
+         if (msg.includes("…")) return;
+
+         // New format: send progress | id=XYZ ip=1.2.3.4 port=40123 overall_sent=123 overall_total=456 overall_percent=78.9 overall_eta=23s rimanenti
+         const overallProgressRegex = /^(?<direction>send|recv) progress \| id=(?<id>[^ ]+) ip=(?<ip>[^ ]+) port=(?<port>[^ ]+) overall_sent=(?<overall_sent>\d+) overall_total=(?<overall_total>\d+) overall_percent=(?<overall_percent>[\d.]+) overall_eta=(?<overall_eta>.+)$/;
+         const overallMatch = msg.match(overallProgressRegex);
+         
+         // Debug: log delle regex matches per il nuovo formato
+         if (msg.includes('overall_sent')) {
+           console.log('🔍 [DEBUG] Parsing overall progress log:', msg);
+           console.log('🔍 [DEBUG] Overall match:', overallMatch);
+         }
+         
+         // Fallback to old format for backward compatibility
+         const progressRegex = /^(?<direction>send|recv) progress \| id=(?<id>[^ ]+) ip=(?<ip>[^ ]+) port=(?<port>[^ ]+) (?:sent|received)=(?<sent>\d+) total=(?<total>\d+) percent=(?<percent>[\d.]+)(?: eta=(?<eta>.+?))? file=(?<file>.+?)(?: \((?<index>\d+)\/(?<count>\d+)\))?$/;
+         const match = msg.match(progressRegex);
+
+        // Handle new overall progress format
+        if (overallMatch && overallMatch.length >= 9) {
+          const direction = overallMatch[1];
+          const ip = overallMatch[3];
+          const port = overallMatch[4];
+          const overall_sent = overallMatch[5];
+          const overall_total = overallMatch[6];
+          const overall_percent = overallMatch[7];
+          const overall_eta = overallMatch[8];
+          
+          console.log('🔍 [DEBUG] Parsed values:', { direction, ip, port, overall_percent, overall_eta });
+          
+          if (direction === 'send' && ip && port && overall_percent) {
             const deviceKey = `${ip}:${port}`;
-            const percent = Math.max(0, Math.min(100, Math.round(percentNum)));
-            setUploadProgress(prev => ({ ...prev, [deviceKey]: percent }));
-            setUploadETA(prev => ({ ...prev, [deviceKey]: etaStr }));
+            const percentNum = Number(overall_percent);
+            const percentClamped = Math.max(0, Math.min(100, Math.round(percentNum)));
+            
+            console.log('🔍 [DEBUG] Updating progress:', { deviceKey, percentClamped, overall_eta });
+            
+            // Update general progress with overall information
+            setGeneralProgress(prev => {
+              const current = prev[deviceKey] || { percent: 0, totalFiles: selectedFiles.length, completedFiles: 0 };
+              return {
+                ...prev,
+                [deviceKey]: {
+                  ...current,
+                  percent: percentClamped,
+                  eta: overall_eta,
+                  totalFiles: selectedFiles.length,
+                  completedFiles: Math.round((percentClamped / 100) * selectedFiles.length),
+                }
+              };
+            });
+            
+            setUploadProgress(prev => ({ ...prev, [deviceKey]: percentClamped }));
+            setUploadETA(prev => ({ ...prev, [deviceKey]: overall_eta }));
           }
           return;
         }
         
-        if (progressMatchWithoutETA) {
-          const direction = progressMatchWithoutETA[1];
-          const ip = progressMatchWithoutETA[3];
-          const port = progressMatchWithoutETA[4];
-          const percentStr = progressMatchWithoutETA[7];
-          const percentNum = Number.parseFloat(percentStr);
-          if (direction === 'send' && ip && port && Number.isFinite(percentNum)) {
+        // Fallback to old format for backward compatibility
+        if (match && match.groups) {
+          const {
+            direction,
+            ip,
+            port,
+            percent,
+            eta,
+            file,
+            index,
+            count,
+          } = match.groups;
+          // Only handle 'send'
+          if (direction === 'send' && ip && port && percent) {
             const deviceKey = `${ip}:${port}`;
-            const percent = Math.max(0, Math.min(100, Math.round(percentNum)));
-            setUploadProgress(prev => ({ ...prev, [deviceKey]: percent }));
-            // Mantieni ETA esistente se disponibile, altrimenti imposta "Calcolo ETA..."
+            const percentNum = Number(percent);
+            const percentClamped = Math.max(0, Math.min(100, Math.round(percentNum)));
+            const totalFiles = count ? parseInt(count, 10) : selectedFiles.length;
+            const completedFiles = index ? parseInt(index, 10) - 1 : 0;
+            // Update general progress
+            setGeneralProgress(prev => {
+              const current = prev[deviceKey] || { percent: 0, totalFiles, completedFiles: 0 };
+              return {
+                ...prev,
+                [deviceKey]: {
+                  ...current,
+                  percent: percentClamped,
+                  eta: eta ?? current.eta ?? t("calculating_eta"),
+                  currentFile: file,
+                  totalFiles,
+                  completedFiles,
+                }
+              };
+            });
+            setUploadProgress(prev => ({ ...prev, [deviceKey]: percentClamped }));
+            // Update ETA if present, otherwise keep old or set calculating
             setUploadETA(prev => {
+              if (eta) {
+                return { ...prev, [deviceKey]: eta };
+              }
+              // If no eta, keep previous or set to calculating
               if (prev[deviceKey] && prev[deviceKey] !== t("calculating_eta")) {
                 return prev;
               }
@@ -161,12 +204,35 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         }
 
         // Parse complete
-        const completeMatch = msg.match(/^send complete \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) path=/);
+        const completeMatch = msg.match(/^send complete \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) path=([^ ]+) file=([^ ]+)(?: \((\d+)\/(\d+)\))?$/);
         if (completeMatch) {
           const ip = completeMatch[2];
           const port = completeMatch[3];
+          const currentFileIndex = completeMatch[6] ? parseInt(completeMatch[6], 10) - 1 : 0;
+          const totalFiles = completeMatch[7] ? parseInt(completeMatch[7], 10) : selectedFiles.length;
+          
           if (ip && port) {
             const deviceKey = `${ip}:${port}`;
+            
+            // Aggiorna progresso generale - file completato
+            setGeneralProgress(prev => {
+              const current = prev[deviceKey] || { percent: 0, totalFiles, completedFiles: 0 };
+              const newCompletedFiles = currentFileIndex + 1;
+              const overallPercent = Math.round((newCompletedFiles / totalFiles) * 100);
+              
+              return {
+                ...prev,
+                [deviceKey]: {
+                  ...current,
+                  percent: overallPercent,
+                  completedFiles: newCompletedFiles,
+                  totalFiles,
+                  currentFile: newCompletedFiles >= totalFiles ? undefined : selectedFiles[newCompletedFiles]?.name,
+                  eta: newCompletedFiles >= totalFiles ? undefined : current.eta
+                }
+              };
+            });
+            
             setUploadProgress(prev => ({ ...prev, [deviceKey]: 100 }));
             // Rimuovi ETA quando il trasferimento è completato
             setUploadETA(prev => {
@@ -272,33 +338,43 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     setIsUploading(true);
     setUploadProgress({});
     setUploadETA({});
-    setFileProgress({});
-    currentFileIndexRef.current = {};
+    setGeneralProgress({});
     toast.info(t("transfer_start", { fileCount: selectedFiles.length, deviceCount: selectedDevices.length }));
 
-                    const sendToDevice = async (deviceId: string) => {
-        let targetIp = '';
-        let targetPort = 0;
-        if (deviceId.includes(':')) {
-          const [ip, port] = deviceId.split(':');
-          targetIp = ip;
-          targetPort = parseInt(port, 10);
-        } else {
-          targetIp = deviceId;
-          // Usa porta 40124 per trasferimento file (TCP)
-          targetPort = 40124;
-        }
+    const sendToDevice = async (deviceId: string) => {
+      // Trova device in allDevices per ottenere IP e porta corretti
+      let targetIp = '';
+      let targetPort = 0;
+      // Prova a trovare il device in allDevices per port
+      const foundDevice = allDevices.find(d => d.id === deviceId);
+      if (foundDevice) {
+        const device = foundDevice as Device;
+        targetIp = device.ip;
+        targetPort = typeof device.port === 'number' ? device.port : 40124;
+      } else if (deviceId.includes(':')) {
+        const [ip, port] = deviceId.split(':');
+        targetIp = ip;
+        targetPort = Number.isNaN(Number(port)) ? 40124 : parseInt(port, 10);
+      } else {
+        targetIp = deviceId;
+        targetPort = 40124;
+      }
 
-        // Usa la stessa chiave per progress e trasferimento
-        const deviceKey = `${targetIp}:40123`;
-        
-        setUploadProgress(prev => ({ ...prev, [deviceKey]: 0 }));
-        setUploadETA(prev => ({ ...prev, [deviceKey]: t("calculating_eta") }));
-        // Inizializza progressi per-file (tutti in coda)
-        setFileProgress(prev => ({
-          ...prev,
-          [deviceKey]: Object.fromEntries(selectedFiles.map((_, i) => [i, { percent: 0, status: 'queued' as const }]))
-        }));
+      // Usa la stessa chiave per progress e trasferimento: deviceKey = `${ip}:${port}`
+      const deviceKey = `${targetIp}:${targetPort}`;
+
+      setUploadProgress(prev => ({ ...prev, [deviceKey]: 0 }));
+      setUploadETA(prev => ({ ...prev, [deviceKey]: t("calculating_eta") }));
+      // Inizializza progresso generale
+      setGeneralProgress(prev => ({
+        ...prev,
+        [deviceKey]: {
+          percent: 0,
+          totalFiles: selectedFiles.length,
+          completedFiles: 0,
+          eta: t("calculating_eta")
+        }
+      }));
 
       try {
         for (let i = 0; i < selectedFiles.length; i++) {
@@ -307,64 +383,49 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           if (!f.path) {
             console.warn('⚠️ [FileTransfer] Path mancante per', f.name, '- prova a selezionare tramite pulsante Seleziona file');
           }
-          
-                                     console.log(`📤 [FileTransfer] Invio file ${i+1}/${selectedFiles.length}:`, {
-           name: f.name,
-           size: f.size,
-           path: filePath,
-           target: `${targetIp}:${targetPort}`,
-           deviceKey
-         });
-           
-           // marca come in upload il file i
-           currentFileIndexRef.current[deviceKey] = i;
-           setFileProgress(prev => {
-             const deviceMap = { ...(prev[deviceKey] || {}) };
-             deviceMap[i] = { percent: 0, status: 'uploading' };
-             return { ...prev, [deviceKey]: deviceMap };
-           });
 
-           await invoke('send_file', { ip: targetIp, port: targetPort, filePath });
-           // al ritorno, è già marcato done dal listener; se non arrivasse l'evento, forza done
-           setFileProgress(prev => {
-             const deviceMap = { ...(prev[deviceKey] || {}) };
-             const existing = deviceMap[i] || { percent: 0, status: 'uploading' as const };
-             deviceMap[i] = { ...existing, percent: 100, eta: undefined, status: 'done' };
-             return { ...prev, [deviceKey]: deviceMap };
-           });
-         }
-         toast.success(t("transfer_success", { device: deviceKey }));
-       } catch (err) {
-         console.error('❌ [FileTransfer] Errore durante invio verso', deviceKey, err);
-         console.error('❌ [FileTransfer] Stack trace:', err);
-         toast.error(t("transfer_error", { device: deviceKey }));
-         
-         // marca corrente come errore
-         const idx = currentFileIndexRef.current[deviceKey];
-         if (typeof idx === 'number') {
-           setFileProgress(prev => {
-             const deviceMap = { ...(prev[deviceKey] || {}) };
-             const existing = deviceMap[idx] || { percent: 0, status: 'uploading' as const };
-             deviceMap[idx] = { ...existing, status: 'error' };
-             return { ...prev, [deviceKey]: deviceMap };
-           });
-         }
-         
-         // Log dettagliato dell'errore per debug
-         if (err instanceof Error) {
-           console.error('❌ [FileTransfer] Error details:', {
-             message: err.message,
-             name: err.name,
-             stack: err.stack
-           });
-         }
-       } finally {
-         setUploadETA(prev => {
-           const n = { ...prev };
-           delete n[deviceKey];
-           return n;
-         });
-       }
+          console.log(`📤 [FileTransfer] Invio file ${i + 1}/${selectedFiles.length}:`, {
+            name: f.name,
+            size: f.size,
+            path: filePath,
+            target: `${targetIp}:${targetPort}`,
+            deviceKey
+          });
+
+          // Calcola la dimensione totale di tutti i file
+          const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+
+          await invoke('send_file_with_progress', {
+            ip: targetIp,
+            port: targetPort,
+            path: filePath,
+            fileIndex: i,
+            totalFiles: selectedFiles.length,
+            fileName: f.name,
+            totalSize: totalSize
+          });
+        }
+        toast.success(t("transfer_success", { device: deviceKey }));
+      } catch (err) {
+        console.error('❌ [FileTransfer] Errore durante invio verso', deviceKey, err);
+        console.error('❌ [FileTransfer] Stack trace:', err);
+        toast.error(t("transfer_error", { device: deviceKey }));
+
+        // Log dettagliato dell'errore per debug
+        if (err instanceof Error) {
+          console.error('❌ [FileTransfer] Error details:', {
+            message: err.message,
+            name: err.name,
+            stack: err.stack
+          });
+        }
+      } finally {
+        setUploadETA(prev => {
+          const n = { ...prev };
+          delete n[deviceKey];
+          return n;
+        });
+      }
     };
 
     await Promise.all(selectedDevices.map(d => sendToDevice(d)));
@@ -373,6 +434,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     setSelectedFiles([]);
     setUploadProgress({});
     setUploadETA({});
+    setGeneralProgress({});
   };
 
   const removeFile = (index?: number) => {
@@ -416,34 +478,50 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           </div>
           <div className="space-y-2">
             {selectedDevices.map(deviceId => {
-              const device = allDevices.find(d => d.id === deviceId) ?? { name: "Dispositivo", ip: deviceId };
-              const deviceTyped = device as Device & { ip: string; port?: number };
-              const key = `${deviceTyped.ip}:${deviceTyped.port ?? 40123}`;
-              const name = deviceTyped.name ?? "Dispositivo";
-              const ip = deviceTyped.ip;
+              // Trova device in allDevices per ottenere IP e porta corretti
+              const foundDevice = allDevices.find(d => d.id === deviceId);
+              let ip: string;
+              let port: number;
+              let name: string;
+              if (foundDevice) {
+                const device = foundDevice as Device;
+                ip = device.ip;
+                port = typeof device.port === "string" ? parseInt(device.port, 10) || 40124 : device.port ?? 40124;
+                name = device.name ?? "Dispositivo";
+              } else if (deviceId.includes(':')) {
+                const [parsedIp, parsedPort] = deviceId.split(':');
+                ip = parsedIp;
+                port = parseInt(parsedPort, 10) || 40124;
+                name = "Dispositivo";
+              } else {
+                ip = deviceId;
+                port = 40124;
+                name = "Dispositivo";
+              }
+              const key = `${ip}:${port}`;
 
               return (
                 <div key={deviceId} className="text-sm space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-300">{`${name} (${ip})`}</span>
-                    {isUploading && uploadProgress[key] !== undefined && (
+                    {isUploading && generalProgress[key] !== undefined && (
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
                           <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
                             <div
                               className="h-full bg-slate-400 transition-all duration-300"
-                              style={{ width: `${uploadProgress[key]}%` }}
+                              style={{ width: `${generalProgress[key].percent}%` }}
                             />
                           </div>
-                          <span className="text-gray-400 text-xs w-8">{uploadProgress[key]}%</span>
+                          <span className="text-gray-400 text-xs w-8">{generalProgress[key].percent}%</span>
                         </div>
-                        {uploadETA[key] && uploadETA[key] !== t("calculating_eta") && (
+                        {generalProgress[key].eta && generalProgress[key].eta !== t("calculating_eta") && (
                           <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/40">
                             <span className="text-slate-300 text-xs">⏱️</span>
-                            <span className="text-slate-200 text-xs">{uploadETA[key]}</span>
+                            <span className="text-slate-200 text-xs">{generalProgress[key].eta}</span>
                           </div>
                         )}
-                        {uploadETA[key] === t("calculating_eta") && (
+                        {generalProgress[key].eta === t("calculating_eta") && (
                           <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-600/40 border border-slate-500/40">
                             <span className="text-slate-400 text-xs">⏳</span>
                             <span className="text-slate-300 text-xs">{t("calculating_eta")}</span>
@@ -453,23 +531,19 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                     )}
                   </div>
 
-                  {/* Progress per-file */}
-                  {isUploading && fileProgress[key] && (
-                    <div className="space-y-1 pl-2">
-                      {selectedFiles.map((f, idx) => {
-                        const fp = fileProgress[key]?.[idx];
-                        const pct = Math.max(0, Math.min(100, Math.round(fp?.percent ?? (fp?.status === 'done' ? 100 : 0))));
-                        const status = fp?.status ?? 'queued';
-                        return (
-                          <div key={idx} className="flex items-center gap-3">
-                            <span className="text-gray-400 text-xs w-44 truncate">{f.name}</span>
-                            <div className="flex-1 h-1 bg-gray-700/60 rounded-full overflow-hidden">
-                              <div className={`h-full transition-all duration-300 ${status === 'error' ? 'bg-red-400' : 'bg-slate-400'}`} style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-gray-400 text-xs w-10 text-right">{pct}%</span>
-                          </div>
-                        );
-                      })}
+                  {/* Progress generale */}
+                  {isUploading && generalProgress[key] && (
+                    <div className="space-y-2 pl-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-400 text-xs">
+                          {generalProgress[key].completedFiles}/{generalProgress[key].totalFiles} file completati
+                        </span>
+                        {generalProgress[key].currentFile && (
+                          <span className="text-gray-500 text-xs truncate max-w-xs">
+                            In corso: {generalProgress[key].currentFile}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -548,7 +622,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                     className="text-gray-300 hover:text-gray-100 hover:bg-gray-700/60"
                     type="button"
                   >
-                    Rimuovi tutti
+                    {t("remove_everything")}
                   </Button>
                 </div>
               </div>

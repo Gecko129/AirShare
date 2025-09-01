@@ -1,5 +1,3 @@
-
-
 {
   "transfer_request_title": "Übertragungsanfrage",
   "transfer_request_description": "{{device}} möchte Ihnen die Datei '{{file}}' ({{size}}) senden",
@@ -34,5 +32,6 @@
   "error": "Fehler",
   "transfer_start": "Starte Übertragung von {{fileCount}} Dateien an {{deviceCount}} Gerät(e)",
   "transfer_success": "Übertragung an {{device}} abgeschlossen",
-  "transfer_error": "Fehler während der Übertragung an {{device}}"
+  "transfer_error": "Fehler während der Übertragung an {{device}}",
+  "remove_everything": "Alles entfernen"
 }

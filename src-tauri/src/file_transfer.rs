@@ -423,16 +423,39 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
 
 /// Send a file to a peer over TCP.
 pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_handle: tauri::AppHandle) -> anyhow::Result<()> {
-    info!("Starting file send to {}:{} with path {:?}", target_ip, target_port, path);
-    tauri_log(&app_handle, "info", format!("send start | ip={} port={} path={}", target_ip, target_port, path.display())).await;
+    send_file_with_progress(target_ip, target_port, path, app_handle, None, None, None, None, None).await
+}
+
+/// Send a file to a peer over TCP with progress information.
+pub async fn send_file_with_progress(
+    target_ip: String, 
+    target_port: u16, 
+    path: PathBuf, 
+    app_handle: tauri::AppHandle,
+    file_index: Option<usize>,
+    total_files: Option<usize>,
+    file_name: Option<String>,
+    overall_sent: Option<std::sync::Arc<TokioMutex<u64>>>,
+    overall_total: Option<u64>
+) -> anyhow::Result<()> {
+    let default_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string();
+    let display_name = file_name.as_ref().unwrap_or(&default_name);
+    let file_info = if let (Some(idx), Some(total)) = (file_index, total_files) {
+        format!(" ({}/{})", idx + 1, total)
+    } else {
+        String::new()
+    };
+    
+    info!("Starting file send to {}:{} with path {:?}{}", target_ip, target_port, path, file_info);
+    tauri_log(&app_handle, "info", format!("send start | ip={} port={} path={} file={}{}", target_ip, target_port, path.display(), display_name, file_info)).await;
     let metadata = fs::metadata(&path).await?;
     let file_size = metadata.len();
-    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string();
+    let actual_file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string();
     let mime = mime_guess::from_path(&path).first_or_octet_stream().to_string();
     let transfer_id = Uuid::new_v4().to_string();
     let offer = FileOffer {
         transfer_id: transfer_id.clone(),
-        file_name: file_name.clone(),
+        file_name: actual_file_name.clone(),
         file_size,
         mime,
         sha256: None,
@@ -566,44 +589,125 @@ pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_h
         let elapsed_ms = transfer_start.elapsed().as_millis();
         let (eta_ms, eta_formatted) = calculate_eta(sent, file_size, elapsed_ms);
 
-        let progress = serde_json::json!({
-            "transfer_id": transfer_id,
-            "sent": sent,
-            "total": file_size,
-            "percent": progress_percentage,
-            "ip": target_ip,
-            "port": target_port,
-            "direction": "send",
-            "eta_ms": eta_ms,
-            "eta_formatted": eta_formatted
-        });
-        let _ = app_handle.emit("transfer_progress", progress);
+        // --- OVERALL PROGRESS SUPPORT ---
+        if let (Some(overall_sent), Some(overall_total)) = (&overall_sent, overall_total) {
+            let mut global = overall_sent.lock().await;
+            *global += n as u64;
+            let overall_percent = (*global as f64 / overall_total as f64) * 100.0;
+            // Calcolo ETA generale
+            let elapsed_ms = transfer_start.elapsed().as_millis();
+            let bytes_remaining = overall_total - *global;
+            let bytes_per_ms = if elapsed_ms > 0 {
+                *global as f64 / elapsed_ms as f64
+            } else {
+                0.0
+            };
+            let (overall_eta_ms, overall_eta_formatted) = if *global == 0 || elapsed_ms == 0 || bytes_per_ms <= 0.0 {
+                (0u128, "Calcolo ETA...".to_string())
+            } else {
+                let eta = (bytes_remaining as f64 / bytes_per_ms) as u128;
+                let eta_formatted = if eta < 1000 {
+                    format!("{}ms rimanenti", eta)
+                } else if eta < 60000 {
+                    format!("{:.0}s rimanenti", eta as f64 / 1000.0)
+                } else if eta < 3600000 {
+                    let minutes = eta / 60000;
+                    let seconds = (eta % 60000) / 1000;
+                    format!("{}m {}s rimanenti", minutes, seconds)
+                } else {
+                    let hours = eta / 3600000;
+                    let minutes = (eta % 3600000) / 60000;
+                    format!("{}h {}m rimanenti", hours, minutes)
+                };
+                (eta, eta_formatted)
+            };
+            let progress = serde_json::json!({
+                "transfer_id": transfer_id,
+                "sent": sent,
+                "total": file_size,
+                "percent": progress_percentage,
+                "overall_sent": *global,
+                "overall_total": overall_total,
+                "overall_percent": overall_percent,
+                "ip": target_ip,
+                "port": target_port,
+                "direction": "send",
+                "eta_ms": eta_ms,
+                "eta_formatted": eta_formatted,
+                "overall_eta_ms": overall_eta_ms,
+                "overall_eta_formatted": overall_eta_formatted
+            });
+            let _ = app_handle.emit("transfer_progress", progress);
+        } else {
+            let progress = serde_json::json!({
+                "transfer_id": transfer_id,
+                "sent": sent,
+                "total": file_size,
+                "percent": progress_percentage,
+                "ip": target_ip,
+                "port": target_port,
+                "direction": "send",
+                "eta_ms": eta_ms,
+                "eta_formatted": eta_formatted
+            });
+            let _ = app_handle.emit("transfer_progress", progress);
+        }
+        // --- END OVERALL PROGRESS SUPPORT ---
         info!("Sent {} / {} bytes", sent, file_size);
 
-        // Throttled log once per second for frontend debugging context
-        if last_log.elapsed().as_secs_f64() >= 1.0 {
-            let (_, eta_formatted) = calculate_eta(sent, file_size, elapsed_ms);
-            info!(
-                "send progress | id={} ip={} port={} sent={} total={} percent={:.1} eta={}",
-                transfer_id,
-                addr.split(':').next().unwrap_or("") ,
-                addr.split(':').nth(1).unwrap_or("") ,
-                sent,
-                file_size,
-                progress_percentage,
-                eta_formatted
-            );
-            tauri_log(&app_handle, "info", format!(
-                "send progress | id={} ip={} port={} sent={} total={} percent={:.1} eta={}",
-                transfer_id,
-                addr.split(':').next().unwrap_or(""),
-                addr.split(':').nth(1).unwrap_or(""),
-                sent,
-                file_size,
-                progress_percentage,
-                eta_formatted
-            )).await;
-            last_log = Instant::now();
+        // Log solo per il progresso generale, non per ogni file
+        if let (Some(overall_sent), Some(overall_total)) = (&overall_sent, overall_total) {
+            if last_log.elapsed().as_secs_f64() >= 1.0 {
+                let global = overall_sent.lock().await;
+                let overall_percent = (*global as f64 / overall_total as f64) * 100.0;
+                let elapsed_ms = transfer_start.elapsed().as_millis();
+                let bytes_remaining = overall_total - *global;
+                let bytes_per_ms = if elapsed_ms > 0 {
+                    *global as f64 / elapsed_ms as f64
+                } else {
+                    0.0
+                };
+                let overall_eta_formatted = if *global == 0 || elapsed_ms == 0 || bytes_per_ms <= 0.0 {
+                    "Calcolo ETA...".to_string()
+                } else {
+                    let eta = (bytes_remaining as f64 / bytes_per_ms) as u128;
+                    if eta < 1000 {
+                        format!("{}ms rimanenti", eta)
+                    } else if eta < 60000 {
+                        format!("{:.0}s rimanenti", eta as f64 / 1000.0)
+                    } else if eta < 3600000 {
+                        let minutes = eta / 60000;
+                        let seconds = (eta % 60000) / 1000;
+                        format!("{}m {}s rimanenti", minutes, seconds)
+                    } else {
+                        let hours = eta / 3600000;
+                        let minutes = (eta % 3600000) / 60000;
+                        format!("{}h {}m rimanenti", hours, minutes)
+                    }
+                };
+                
+                info!(
+                    "send progress | id={} ip={} port={} overall_sent={} overall_total={} overall_percent={:.1} overall_eta={}",
+                    transfer_id,
+                    addr.split(':').next().unwrap_or(""),
+                    addr.split(':').nth(1).unwrap_or(""),
+                    *global,
+                    overall_total,
+                    overall_percent,
+                    overall_eta_formatted
+                );
+                tauri_log(&app_handle, "info", format!(
+                    "send progress | id={} ip={} port={} overall_sent={} overall_total={} overall_percent={:.1} overall_eta={}",
+                    transfer_id,
+                    addr.split(':').next().unwrap_or(""),
+                    addr.split(':').nth(1).unwrap_or(""),
+                    *global,
+                    overall_total,
+                    overall_percent,
+                    overall_eta_formatted
+                )).await;
+                last_log = Instant::now();
+            }
         }
     }
 
@@ -633,20 +737,27 @@ pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_h
     }));
     info!("Invio del file completato: {:?}", path);
     info!("Target: {}:{}, Local addr: {}", target_ip, target_port, addr);
+    let file_info = if let (Some(idx), Some(total)) = (file_index, total_files) {
+        format!(" file={} ({}/{})", display_name, idx + 1, total)
+    } else {
+        format!(" file={}", display_name)
+    };
+    
     tauri_log(
         &app_handle,
         "info",
         format!(
-            "invio completato | id={} ip={} port={} percorso={}",
+            "send complete | id={} ip={} port={} path={}{}",
             transfer_id,
             addr.split(':').next().unwrap_or(""),
             addr.split(':').nth(1).unwrap_or(""),
-            path.display()
+            path.display(),
+            file_info
         )
     ).await;
     // Mostra una finestra di dialogo come per la ricezione
     let device_name = gethostname::gethostname().to_string_lossy().to_string();
-    app_handle.dialog().message(format!("✅ File '{}' inviato correttamente a {} ({})", file_name, device_name, target_ip))
+    app_handle.dialog().message(format!("✅ File '{}' inviato correttamente a {} ({})", actual_file_name, device_name, target_ip))
         .title("AirShare - Trasferimento completato")
         .kind(tauri_plugin_dialog::MessageDialogKind::Info)
         .show(|_| {});

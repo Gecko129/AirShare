@@ -1,5 +1,3 @@
-
-
 {
   "transfer_request_title": "Demande de transfert",
   "transfer_request_description": "{{device}} veut vous envoyer le fichier '{{file}}' ({{size}})",
@@ -34,5 +32,6 @@
   "error": "Erreur",
   "transfer_start": "Début du transfert de {{fileCount}} fichiers vers {{deviceCount}} appareil(s)",
   "transfer_success": "Transfert terminé vers {{device}}",
-  "transfer_error": "Erreur lors du transfert vers {{device}}"
+  "transfer_error": "Erreur lors du transfert vers {{device}}",
+  "remove_everything": "Tout supprimer"
 }

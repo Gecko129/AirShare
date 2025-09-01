@@ -32,5 +32,6 @@
   "error": "Errore",
   "transfer_start": "Inizio invio di {{fileCount}} file verso {{deviceCount}} dispositivo/i",
   "transfer_success": "Trasferimento completato verso {{device}}",
-  "transfer_error": "Errore durante invio verso {{device}}"
+  "transfer_error": "Errore durante invio verso {{device}}",
+  "remove_everything": "Rimuovi tutto"
 }

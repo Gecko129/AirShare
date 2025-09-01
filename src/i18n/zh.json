@@ -32,5 +32,6 @@
   "error": "错误",
   "transfer_start": "开始向 {{deviceCount}} 个设备传输 {{fileCount}} 个文件",
   "transfer_success": "传输到 {{device}} 完成",
-  "transfer_error": "传输到 {{device}} 时出错"
+  "transfer_error": "传输到 {{device}} 时出错",
+  "remove_everything": "删除所有"
 }
