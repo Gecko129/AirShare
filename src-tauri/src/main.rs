@@ -111,11 +111,25 @@ async fn udp_broadcast_heartbeat_loop() {
     let socket = TokioUdpSocket::bind(("0.0.0.0", 0)).await.expect("bind failed");
     socket.set_broadcast(true).expect("set broadcast failed");
     let broadcast_addr = SocketAddr::from(([255,255,255,255], BROADCAST_PORT));
+    info!("Starting UDP broadcast loop on port {} with device: {} ({})", BROADCAST_PORT, device.name, device.ip);
+    
     loop {
         let mut to_send = device.clone();
         to_send.last_seen = Utc::now().to_rfc3339();
         let json = serde_json::to_string(&to_send).unwrap();
-        let _ = socket.send_to(json.as_bytes(), &broadcast_addr).await;
+        match socket.send_to(json.as_bytes(), &broadcast_addr).await {
+            Ok(_) => {
+                // Log solo ogni 10 heartbeat per non riempire i log
+                static mut COUNTER: u64 = 0;
+                unsafe {
+                    COUNTER += 1;
+                    if COUNTER % 10 == 0 {
+                        info!("Broadcasted heartbeat #{} to {}:{}", COUNTER, broadcast_addr.ip(), broadcast_addr.port());
+                    }
+                }
+            }
+            Err(e) => error!("Failed to broadcast heartbeat: {}", e),
+        }
         time::sleep(Duration::from_secs(HEARTBEAT_INTERVAL_SECS)).await;
     }
 }
@@ -140,6 +154,7 @@ async fn udp_listener_loop(devices: SharedDevices) {
         match get_local_ip() {
             Some(local_ip) => {
                 if dev.ip == local_ip {
+                    info!("Ignoring own heartbeat from {}", local_ip);
                     continue;
                 }
             }
@@ -147,16 +162,21 @@ async fn udp_listener_loop(devices: SharedDevices) {
                 warn!("Failed to get local IP");
             }
         }
+        
+        info!("Received device heartbeat: {} ({}) from {}", dev.name, dev.ip, addr);
+        
         let now = Instant::now();
         let mut devs = devices.lock().unwrap();
         if let Some(existing) = devs.iter_mut().find(|d| d.device.ip == dev.ip) {
             existing.device = dev.clone();
             existing.last_seen_instant = now;
+            info!("Updated existing device: {} ({})", dev.name, dev.ip);
         } else {
             devs.push(DeviceEntry {
                 device: dev.clone(),
                 last_seen_instant: now,
             });
+            info!("Added new device: {} ({})", dev.name, dev.ip);
         }
     }
 }
@@ -175,7 +195,12 @@ async fn cleanup_loop(devices: SharedDevices) {
 #[tauri::command]
 fn get_devices(devices: tauri::State<'_, SharedDevices>) -> Vec<Device> {
     let devs = devices.lock().unwrap();
-    devs.iter().map(|entry| entry.device.clone()).collect()
+    let device_list: Vec<Device> = devs.iter().map(|entry| entry.device.clone()).collect();
+    info!("Frontend requested devices, returning {} devices", device_list.len());
+    for device in &device_list {
+        info!("  - {} ({})", device.name, device.ip);
+    }
+    device_list
 }
 
 #[tauri::command]

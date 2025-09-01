@@ -114,6 +114,16 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
     info!("File server listening on 0.0.0.0:40124");
     tauri_log(&app_handle, "info", "File server listening on 0.0.0.0:40124").await;
     info!("Entering file server loop");
+    
+    // Log delle interfacce di rete disponibili per debug
+    if let Ok(addrs) = get_if_addrs::get_if_addrs() {
+        info!("Available network interfaces:");
+        for iface in addrs {
+            if !iface.is_loopback() {
+                info!("  - {}: {}", iface.name, iface.ip());
+            }
+        }
+    }
     loop {
         let (mut socket, addr) = match listener.accept().await {
             Ok(res) => {
@@ -430,8 +440,22 @@ pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_h
     let addr = format!("{}:{}", target_ip, target_port);
     info!("Connecting to target address: {}", addr);
     tauri_log(&app_handle, "info", format!("Connecting to {}", addr)).await;
+    
+    // Log delle interfacce locali per debug
+    if let Ok(addrs) = get_if_addrs::get_if_addrs() {
+        info!("Local network interfaces:");
+        for iface in addrs {
+            if !iface.is_loopback() {
+                info!("  - {}: {}", iface.name, iface.ip());
+            }
+        }
+    }
+    
     let mut stream = match TcpStream::connect(&addr).await {
-        Ok(s) => s,
+        Ok(s) => {
+            info!("Successfully connected to {}", addr);
+            s
+        }
         Err(e) => {
             error!("Failed to connect to target {}: {}", addr, e);
             tauri_log(&app_handle, "error", format!("Failed to connect to {}: {}", addr, e)).await;
