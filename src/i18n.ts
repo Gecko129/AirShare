@@ -8,6 +8,25 @@ import fr from "./i18n/fr.json";
 import de from "./i18n/de.json";
 import zh from "./i18n/zh.json";
 
+function detectSystemLanguage(): string {
+  const supportedLanguages = ["it", "en", "es", "fr", "de", "zh"];
+  
+  const savedLanguage = localStorage.getItem("airshare-language");
+  if (savedLanguage && supportedLanguages.includes(savedLanguage)) {
+    return savedLanguage;
+  }
+  
+  let systemLanguage = navigator.language || navigator.languages?.[0] || "en";
+  
+  const primaryLanguage = systemLanguage.split("-")[0].toLowerCase();
+  
+  if (supportedLanguages.includes(primaryLanguage)) {
+    return primaryLanguage;
+  }
+  
+  return "it";
+}
+
 i18n.use(initReactI18next).init({
   resources: {
     it: { translation: it },
@@ -17,11 +36,15 @@ i18n.use(initReactI18next).init({
     de: { translation: de },
     zh: { translation: zh },
   },
-  lng: "it",
-  fallbackLng: "en",
+  lng: detectSystemLanguage(),
+  fallbackLng: "it",
   interpolation: {
     escapeValue: false,
   },
+});
+
+i18n.on("languageChanged", (lng) => {
+  localStorage.setItem("airshare-language", lng);
 });
 
 export default i18n;

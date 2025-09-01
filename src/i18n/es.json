@@ -16,7 +16,7 @@
   "detected_devices": "Dispositivos Detectados",
   "available_devices": "{{count}} dispositivos disponibles",
   "no_devices_found": "No se detectaron dispositivos",
-  "scanning_network": "Escaneando la red...",
+  "scanning_network": "Escaneando red...",
   "select_all": "Seleccionar todos",
   "deselect_all": "Deseleccionar todos",
   "detected_badge": "Detectado",
@@ -28,5 +28,11 @@
   "listening_devices": "Escuchando dispositivos AirShare",
   "airshare_active": "AirShare activo",
   "devices_selected": "{{count}} dispositivos seleccionados",
-  "scanning_interval": "Escaneando cada 3s"
+  "scanning_interval": "Escaneo cada 3s",
+  "remove_all": "Eliminar todos",
+  "calculating_eta": "Calculando ETA...",
+  "error": "Error",
+  "transfer_start": "Iniciando transferencia de {{fileCount}} archivos a {{deviceCount}} dispositivo(s)",
+  "transfer_success": "Transferencia completada a {{device}}",
+  "transfer_error": "Error durante la transferencia a {{device}}"
 }

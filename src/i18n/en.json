@@ -26,5 +26,11 @@
   "listening_devices": "Listening for AirShare devices",
   "airshare_active": "AirShare active",
   "devices_selected": "{{count}} devices selected",
-  "scanning_interval": "Scanning every 3s"
+  "scanning_interval": "Scanning every 3s",
+  "remove_all": "Remove all",
+  "calculating_eta": "Calculating ETA...",
+  "error": "Error",
+  "transfer_start": "Starting transfer of {{fileCount}} files to {{deviceCount}} device(s)",
+  "transfer_success": "Transfer completed to {{device}}",
+  "transfer_error": "Error during transfer to {{device}}"
 }

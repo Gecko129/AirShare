@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -9,19 +9,32 @@ import { motion, AnimatePresence } from 'motion/react';
 // usa il backend Tauri get_file_info invece del plugin-fs
 import type { Device } from '../types/device';
 import { useTranslation } from "react-i18next";
+import { toast } from 'sonner';
 
 interface FileTransferProps {
   selectedDevices: string[];
   onDevicesUpdate?: (callback: (devices: Device[]) => void) => void;
 }
 
+interface UploadFile {
+  name: string;
+  size: number;
+  // percorso assoluto richiesto dal backend
+  path?: string;
+}
+
 export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferProps) {
   const { t } = useTranslation();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [uploadETA, setUploadETA] = useState<Record<string, string>>({});
+
+  // Avanzamento per-file per ogni dispositivo: deviceKey -> fileIndex -> stato/percentuale
+  const [fileProgress, setFileProgress] = useState<Record<string, Record<number, { percent: number; eta?: string; status: 'queued' | 'uploading' | 'done' | 'error' }>>>({});
+  // Indice del file attualmente in upload per device (mutabile senza triggerare re-render a ogni tick)
+  const currentFileIndexRef = useRef<Record<string, number>>({});
 
   // const [deviceNames, setDeviceNames] = useState<Record<string, string>>({});
   // Stato per la lista di tutti i dispositivi ricevuti dal backend
@@ -54,6 +67,16 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
               [deviceKey]: p.eta_formatted,
             }));
           }
+
+          // Aggiorna anche il progresso per-file corrente di questo device
+          const idx = currentFileIndexRef.current[deviceKey];
+          if (typeof idx === 'number') {
+            setFileProgress(prev => {
+              const deviceMap = { ...(prev[deviceKey] || {}) };
+              deviceMap[idx] = { percent, eta: p.eta_formatted, status: 'uploading' };
+              return { ...prev, [deviceKey]: deviceMap };
+            });
+          }
         }
       });
 
@@ -71,6 +94,17 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             delete newETA[deviceKey];
             return newETA;
           });
+
+          // Marca il file corrente come completato a 100%
+          const idx = currentFileIndexRef.current[deviceKey];
+          if (typeof idx === 'number') {
+            setFileProgress(prev => {
+              const deviceMap = { ...(prev[deviceKey] || {}) };
+              const existing = deviceMap[idx] || { percent: 0, status: 'uploading' as const };
+              deviceMap[idx] = { ...existing, percent: 100, eta: undefined, status: 'done' };
+              return { ...prev, [deviceKey]: deviceMap };
+            });
+          }
         }
       });
 
@@ -117,10 +151,10 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             setUploadProgress(prev => ({ ...prev, [deviceKey]: percent }));
             // Mantieni ETA esistente se disponibile, altrimenti imposta "Calcolo ETA..."
             setUploadETA(prev => {
-              if (prev[deviceKey] && prev[deviceKey] !== "Calcolo ETA...") {
+              if (prev[deviceKey] && prev[deviceKey] !== t("calculating_eta")) {
                 return prev;
               }
-              return { ...prev, [deviceKey]: "Calcolo ETA..." };
+              return { ...prev, [deviceKey]: t("calculating_eta") };
             });
           }
           return;
@@ -168,10 +202,19 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     setIsDragging(false);
 
     const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      console.log("File droppato:", files[0].name);
-      setSelectedFile(files[0]);
+    if (!files || files.length === 0) return;
+
+    const dropped: UploadFile[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i] as any;
+      dropped.push({
+        name: f.name,
+        size: (typeof f.size === 'number' ? f.size : 0),
+        // In molti ambienti web il path non è disponibile; Tauri/Electron a volte lo forniscono come f.path
+        path: typeof f.path === 'string' ? f.path : undefined,
+      });
     }
+    setSelectedFiles(prev => [...prev, ...dropped]);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -186,46 +229,49 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
 
   const handleFileDialog = async () => {
     console.log("Apertura finestra di dialogo file");
-    const selected = await open({ multiple: false });
-    if (selected) {
-      if (typeof selected === 'string') {
-        console.log("File selezionato:", selected);
-        
-        try {
-          // Ottieni le informazioni del file dal backend Tauri
-          const fileInfo = await invoke<{ size: number; name: string; is_file: boolean }>('get_file_info', { filePath: selected });
+    const selected = await open({ multiple: true });
+    if (!selected) return;
 
-          // Crea un oggetto File simulato con la dimensione reale
-          setSelectedFile({
-            name: fileInfo?.name || (selected.split(/[\\/]/).pop() || 'file'),
-            size: typeof fileInfo?.size === 'number' ? fileInfo.size : 0,
-            path: selected
-          } as any);
-        } catch (error) {
-          console.error("Errore nel leggere le informazioni del file:", error);
-          // Fallback con size 0 in caso di errore
-          setSelectedFile({
-            name: selected.split(/[\\/]/).pop() || 'file',
-            size: 0,
-            path: selected
-          } as any);
-        }
+    const addOne = async (path: string) => {
+      try {
+        const fileInfo = await invoke<{ size: number; name: string; is_file: boolean }>('get_file_info', { filePath: path });
+        const item: UploadFile = {
+          name: fileInfo?.name || (path.split(/[\\/]/).pop() || 'file'),
+          size: typeof fileInfo?.size === 'number' ? fileInfo.size : 0,
+          path,
+        };
+        setSelectedFiles(prev => [...prev, item]);
+      } catch (error) {
+        console.error("Errore nel leggere le informazioni del file:", error);
+        const item: UploadFile = {
+          name: path.split(/[\\/]/).pop() || 'file',
+          size: 0,
+          path,
+        };
+        setSelectedFiles(prev => [...prev, item]);
+      }
+    };
+
+    if (typeof selected === 'string') {
+      await addOne(selected);
+    } else if (Array.isArray(selected)) {
+      for (const p of selected) {
+        await addOne(p);
       }
     }
   };
 
   const handleSend = async () => {
-    if (!selectedFile || selectedDevices.length === 0) return;
-
-    console.log("Inizio invio file", selectedFile, selectedDevices);
+    if (selectedFiles.length === 0 || selectedDevices.length === 0) return;
 
     setIsUploading(true);
     setUploadProgress({});
     setUploadETA({});
+    setFileProgress({});
+    currentFileIndexRef.current = {};
+    toast.info(t("transfer_start", { fileCount: selectedFiles.length, deviceCount: selectedDevices.length }));
 
-    // Per ora, placeholder per IP e porta; in futuro recupera dal deviceId.
-    // Esempio: deviceId = "192.168.1.10:40124"
-    for (const deviceId of selectedDevices) {
+    const sendToDevice = async (deviceId: string) => {
       let targetIp = '';
       let targetPort = 0;
       if (deviceId.includes(':')) {
@@ -233,59 +279,80 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         targetIp = ip;
         targetPort = parseInt(port, 10);
       } else {
-        // fallback: deviceId as IP, porta di default
         targetIp = deviceId;
         targetPort = 40124;
       }
-      console.log("Invio a deviceId:", deviceId, "IP:", targetIp, "Porta:", targetPort);
+
+      const deviceKey = `${targetIp}:${targetPort}`;
+      setUploadProgress(prev => ({ ...prev, [deviceKey]: 0 }));
+              setUploadETA(prev => ({ ...prev, [deviceKey]: t("calculating_eta") }));
+      // Inizializza progressi per-file (tutti in coda)
+      setFileProgress(prev => ({
+        ...prev,
+        [deviceKey]: Object.fromEntries(selectedFiles.map((_, i) => [i, { percent: 0, status: 'queued' as const }]))
+      }));
+
       try {
-        setUploadProgress(prev => ({
-          ...prev,
-          [deviceId]: 0
-        }));
-        setUploadETA(prev => ({
-          ...prev,
-          [deviceId]: "Calcolo ETA..."
-        }));
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const f = selectedFiles[i];
+          const filePath = f.path || f.name;
+          if (!f.path) {
+            console.warn('Path mancante per', f.name, '- prova a selezionare tramite pulsante Seleziona file');
+          }
+          // marca come in upload il file i
+          currentFileIndexRef.current[deviceKey] = i;
+          setFileProgress(prev => {
+            const deviceMap = { ...(prev[deviceKey] || {}) };
+            deviceMap[i] = { percent: 0, status: 'uploading' };
+            return { ...prev, [deviceKey]: deviceMap };
+          });
 
-        // Chiamata al backend Tauri
-        // Nota: potremmo dover convertire il File in un path o usare FileReader per i dati
-        const filePath = (selectedFile as any).path || selectedFile.name;
-        console.log("Chiamata invoke con argomenti:", { filePath, ip: targetIp, port: targetPort });
-        // Passa i parametri come oggetto con nomi che corrispondono alla funzione Rust
-        await invoke('send_file', { 
-          ip: targetIp, 
-          port: targetPort, 
-          filePath: filePath 
-        });
-
-        console.log("Invio completato per", deviceId);
+          await invoke('send_file', { ip: targetIp, port: targetPort, filePath });
+          // al ritorno, è già marcato done dal listener; se non arrivasse l'evento, forza done
+          setFileProgress(prev => {
+            const deviceMap = { ...(prev[deviceKey] || {}) };
+            const existing = deviceMap[i] || { percent: 0, status: 'uploading' as const };
+            deviceMap[i] = { ...existing, percent: 100, eta: undefined, status: 'done' };
+            return { ...prev, [deviceKey]: deviceMap };
+          });
+        }
+        toast.success(t("transfer_success", { device: deviceKey }));
       } catch (err) {
-        // Log errore e imposta progresso a 0 o -1 (se vuoi mostrare errore)
-        console.error("Errore durante l'invio a", deviceId, err);
-        setUploadProgress(prev => ({
-          ...prev,
-          [deviceId]: 0
-        }));
-        setUploadETA(prev => ({
-          ...prev,
-          [deviceId]: "Errore"
-        }));
+        console.error('Errore durante invio verso', deviceKey, err);
+        toast.error(t("transfer_error", { device: deviceKey }));
+        // marca corrente come errore
+        const idx = currentFileIndexRef.current[deviceKey];
+        if (typeof idx === 'number') {
+          setFileProgress(prev => {
+            const deviceMap = { ...(prev[deviceKey] || {}) };
+            const existing = deviceMap[idx] || { percent: 0, status: 'uploading' as const };
+            deviceMap[idx] = { ...existing, status: 'error' };
+            return { ...prev, [deviceKey]: deviceMap };
+          });
+        }
+      } finally {
+        setUploadETA(prev => {
+          const n = { ...prev };
+          delete n[deviceKey];
+          return n;
+        });
       }
-    }
+    };
 
-    // Breve attesa per mostrare completamento
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await Promise.all(selectedDevices.map(d => sendToDevice(d)));
 
     setIsUploading(false);
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setUploadProgress({});
     setUploadETA({});
-    console.log("Invio terminato");
   };
 
-  const removeFile = () => {
-    setSelectedFile(null);
+  const removeFile = (index?: number) => {
+    if (typeof index === 'number') {
+      setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    } else {
+      setSelectedFiles([]);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -296,7 +363,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const canSend = selectedFile && selectedDevices.length > 0 && !isUploading;
+  const canSend = selectedFiles.length > 0 && selectedDevices.length > 0 && !isUploading;
 
   return (
     <Card className="backdrop-blur-md bg-gray-900/40 border border-gray-700/50 shadow-2xl p-6">
@@ -328,31 +395,53 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
               const ip = deviceTyped.ip;
 
               return (
-                <div key={deviceId} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-300">{`${name} (${ip})`}</span>
-                  {isUploading && uploadProgress[key] !== undefined && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-slate-400 transition-all duration-300"
-                            style={{ width: `${uploadProgress[key]}%` }}
-                          />
+                <div key={deviceId} className="text-sm space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">{`${name} (${ip})`}</span>
+                    {isUploading && uploadProgress[key] !== undefined && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-slate-400 transition-all duration-300"
+                              style={{ width: `${uploadProgress[key]}%` }}
+                            />
+                          </div>
+                          <span className="text-gray-400 text-xs w-8">{uploadProgress[key]}%</span>
                         </div>
-                        <span className="text-gray-400 text-xs w-8">{uploadProgress[key]}%</span>
+                        {uploadETA[key] && uploadETA[key] !== t("calculating_eta") && (
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/40">
+                            <span className="text-slate-300 text-xs">⏱️</span>
+                            <span className="text-slate-200 text-xs">{uploadETA[key]}</span>
+                          </div>
+                        )}
+                        {uploadETA[key] === t("calculating_eta") && (
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-600/40 border border-slate-500/40">
+                            <span className="text-slate-400 text-xs">⏳</span>
+                            <span className="text-slate-300 text-xs">{t("calculating_eta")}</span>
+                          </div>
+                        )}
                       </div>
-                      {uploadETA[key] && uploadETA[key] !== "Calcolo ETA..." && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/40">
-                          <span className="text-slate-300 text-xs">⏱️</span>
-                          <span className="text-slate-200 text-xs">{uploadETA[key]}</span>
-                        </div>
-                      )}
-                      {uploadETA[key] === "Calcolo ETA..." && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-600/40 border border-slate-500/40">
-                          <span className="text-slate-400 text-xs">⏳</span>
-                          <span className="text-slate-300 text-xs">{t("calculating_eta")}</span>
-                        </div>
-                      )}
+                    )}
+                  </div>
+
+                  {/* Progress per-file */}
+                  {isUploading && fileProgress[key] && (
+                    <div className="space-y-1 pl-2">
+                      {selectedFiles.map((f, idx) => {
+                        const fp = fileProgress[key]?.[idx];
+                        const pct = Math.max(0, Math.min(100, Math.round(fp?.percent ?? (fp?.status === 'done' ? 100 : 0))));
+                        const status = fp?.status ?? 'queued';
+                        return (
+                          <div key={idx} className="flex items-center gap-3">
+                            <span className="text-gray-400 text-xs w-44 truncate">{f.name}</span>
+                            <div className="flex-1 h-1 bg-gray-700/60 rounded-full overflow-hidden">
+                              <div className={`h-full transition-all duration-300 ${status === 'error' ? 'bg-red-400' : 'bg-slate-400'}`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-gray-400 text-xs w-10 text-right">{pct}%</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -375,7 +464,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         }`}
       >
         <AnimatePresence mode="wait">
-          {!selectedFile ? (
+          {selectedFiles.length === 0 ? (
             <motion.div
               key="upload-area"
               initial={{ opacity: 0, y: 10 }}
@@ -393,30 +482,47 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             </motion.div>
           ) : (
             <motion.div
-              key="file-preview"
+              key="file-list"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="space-y-4"
+              className="space-y-3"
             >
-              <div className="flex items-center justify-center gap-4 p-4 rounded-lg bg-gray-800/40">
-                <File className="w-8 h-8 text-slate-300" />
-                <div className="text-left">
-                  <p className="text-gray-200 truncate max-w-xs">{selectedFile.name}</p>
-                  <p className="text-gray-400 text-sm">{formatFileSize(selectedFile.size)}</p>
+              <div className="space-y-2">
+                {selectedFiles.map((f, idx) => (
+                  <div key={`${f.name}-${idx}`} className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40">
+                    <div className="flex items-center gap-3">
+                      <File className="w-6 h-6 text-slate-300" />
+                      <div className="text-left">
+                        <p className="text-gray-200 truncate max-w-xs">{f.name}</p>
+                        <p className="text-gray-400 text-sm">{formatFileSize(f.size)}</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        removeFile(idx);
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-gray-200 hover:bg-gray-700/60"
+                      type="button"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex justify-end">
+                  <Button
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); removeFile(); }}
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-300 hover:text-gray-100 hover:bg-gray-700/60"
+                    type="button"
+                  >
+                    Rimuovi tutti
+                  </Button>
                 </div>
-                <Button
-                  onClick={(e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    removeFile();
-                  }}
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-400 hover:text-gray-200 hover:bg-gray-700/60"
-                  type="button"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
               </div>
             </motion.div>
           )}
@@ -424,7 +530,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
       </div>
 
       {/* Warning per nessun dispositivo selezionato */}
-      {selectedFile && selectedDevices.length === 0 && (
+      {selectedFiles.length > 0 && selectedDevices.length === 0 && (
         <div className="mt-4 p-3 rounded-lg bg-orange-900/40 border border-orange-700/40 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-orange-400" />
           <span className="text-orange-300 text-sm">{t("no_device_selected")}</span>
