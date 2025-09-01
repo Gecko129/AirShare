@@ -276,26 +276,31 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     currentFileIndexRef.current = {};
     toast.info(t("transfer_start", { fileCount: selectedFiles.length, deviceCount: selectedDevices.length }));
 
-    const sendToDevice = async (deviceId: string) => {
-      let targetIp = '';
-      let targetPort = 0;
-      if (deviceId.includes(':')) {
-        const [ip, port] = deviceId.split(':');
-        targetIp = ip;
-        targetPort = parseInt(port, 10);
-      } else {
-        targetIp = deviceId;
-        targetPort = 40123;
-      }
+          const sendToDevice = async (deviceId: string) => {
+        let targetIp = '';
+        let targetPort = 0;
+        if (deviceId.includes(':')) {
+          const [ip, port] = deviceId.split(':');
+          targetIp = ip;
+          targetPort = parseInt(port, 10);
+        } else {
+          targetIp = deviceId;
+          // IMPORTANTE: Usa porta 40124 per trasferimento file (TCP), non 40123 (UDP broadcast)
+          targetPort = 40124;
+        }
 
-      const deviceKey = `${targetIp}:${targetPort}`;
-      setUploadProgress(prev => ({ ...prev, [deviceKey]: 0 }));
-              setUploadETA(prev => ({ ...prev, [deviceKey]: t("calculating_eta") }));
-      // Inizializza progressi per-file (tutti in coda)
-      setFileProgress(prev => ({
-        ...prev,
-        [deviceKey]: Object.fromEntries(selectedFiles.map((_, i) => [i, { percent: 0, status: 'queued' as const }]))
-      }));
+              // IMPORTANTE: Per il progress tracking, usa la porta UDP (40123) per identificare il dispositivo
+        // Per l'invio file, usa la porta TCP (40124)
+        const deviceKeyForProgress = `${targetIp}:40123`;
+        const deviceKeyForTransfer = `${targetIp}:${targetPort}`;
+        
+        setUploadProgress(prev => ({ ...prev, [deviceKeyForProgress]: 0 }));
+        setUploadETA(prev => ({ ...prev, [deviceKeyForProgress]: t("calculating_eta") }));
+        // Inizializza progressi per-file (tutti in coda)
+        setFileProgress(prev => ({
+          ...prev,
+          [deviceKeyForProgress]: Object.fromEntries(selectedFiles.map((_, i) => [i, { percent: 0, status: 'queued' as const }]))
+        }));
 
       try {
         for (let i = 0; i < selectedFiles.length; i++) {
@@ -305,44 +310,46 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             console.warn('⚠️ [FileTransfer] Path mancante per', f.name, '- prova a selezionare tramite pulsante Seleziona file');
           }
           
-          console.log(`📤 [FileTransfer] Invio file ${i+1}/${selectedFiles.length}:`, {
-            name: f.name,
-            size: f.size,
-            path: filePath,
-            target: `${targetIp}:${targetPort}`
-          });
+                  console.log(`📤 [FileTransfer] Invio file ${i+1}/${selectedFiles.length}:`, {
+          name: f.name,
+          size: f.size,
+          path: filePath,
+          target: `${targetIp}:${targetPort}`,
+          deviceKeyForProgress,
+          deviceKeyForTransfer
+        });
           
           // marca come in upload il file i
-          currentFileIndexRef.current[deviceKey] = i;
+          currentFileIndexRef.current[deviceKeyForProgress] = i;
           setFileProgress(prev => {
-            const deviceMap = { ...(prev[deviceKey] || {}) };
+            const deviceMap = { ...(prev[deviceKeyForProgress] || {}) };
             deviceMap[i] = { percent: 0, status: 'uploading' };
-            return { ...prev, [deviceKey]: deviceMap };
+            return { ...prev, [deviceKeyForProgress]: deviceMap };
           });
 
           await invoke('send_file', { ip: targetIp, port: targetPort, filePath });
           // al ritorno, è già marcato done dal listener; se non arrivasse l'evento, forza done
           setFileProgress(prev => {
-            const deviceMap = { ...(prev[deviceKey] || {}) };
+            const deviceMap = { ...(prev[deviceKeyForProgress] || {}) };
             const existing = deviceMap[i] || { percent: 0, status: 'uploading' as const };
             deviceMap[i] = { ...existing, percent: 100, eta: undefined, status: 'done' };
-            return { ...prev, [deviceKey]: deviceMap };
+            return { ...prev, [deviceKeyForProgress]: deviceMap };
           });
         }
-        toast.success(t("transfer_success", { device: deviceKey }));
+        toast.success(t("transfer_success", { device: deviceKeyForProgress }));
       } catch (err) {
-        console.error('❌ [FileTransfer] Errore durante invio verso', deviceKey, err);
+        console.error('❌ [FileTransfer] Errore durante invio verso', deviceKeyForProgress, err);
         console.error('❌ [FileTransfer] Stack trace:', err);
-        toast.error(t("transfer_error", { device: deviceKey }));
+        toast.error(t("transfer_error", { device: deviceKeyForProgress }));
         
         // marca corrente come errore
-        const idx = currentFileIndexRef.current[deviceKey];
+        const idx = currentFileIndexRef.current[deviceKeyForProgress];
         if (typeof idx === 'number') {
           setFileProgress(prev => {
-            const deviceMap = { ...(prev[deviceKey] || {}) };
+            const deviceMap = { ...(prev[deviceKeyForProgress] || {}) };
             const existing = deviceMap[idx] || { percent: 0, status: 'uploading' as const };
             deviceMap[idx] = { ...existing, status: 'error' };
-            return { ...prev, [deviceKey]: deviceMap };
+            return { ...prev, [deviceKeyForProgress]: deviceMap };
           });
         }
         
@@ -357,7 +364,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
       } finally {
         setUploadETA(prev => {
           const n = { ...prev };
-          delete n[deviceKey];
+          delete n[deviceKeyForProgress];
           return n;
         });
       }

@@ -608,6 +608,7 @@ pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_h
         "direction": "send"
     }));
     info!("Invio del file completato: {:?}", path);
+    info!("Target: {}:{}, Local addr: {}", target_ip, target_port, addr);
     tauri_log(
         &app_handle,
         "info",
