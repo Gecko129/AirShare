@@ -117,8 +117,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         console.log(`[backend][${level}]`, msg);
 
         // Esempi attesi:
-        // "send progress | id=... ip=1.2.3.4 port=40124 sent=123 total=456 percent=27.3 eta=1m 20s rimanenti"
-        // "send complete | id=... ip=1.2.3.4 port=40124 path=/..."
+        // "send progress | id=... ip=1.2.3.4 port=40123 sent=123 total=456 percent=27.3 eta=1m 20s rimanenti"
+        // "send complete | id=... ip=1.2.3.4 port=40123 path=/..."
         // Parse progress con ETA opzionale
         const progressMatchWithETA = msg.match(/^(send|recv) progress \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) (?:sent|received)=([0-9]+) total=([0-9]+) percent=([0-9.]+) eta=(.+)$/);
         const progressMatchWithoutETA = msg.match(/^(send|recv) progress \| id=([^ ]+) ip=([^ ]+) port=([^ ]+) (?:sent|received)=([0-9]+) total=([0-9]+) percent=([0-9.]+)$/);
@@ -264,6 +264,11 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
   const handleSend = async () => {
     if (selectedFiles.length === 0 || selectedDevices.length === 0) return;
 
+    console.log("🚀 [FileTransfer] Inizio invio:", { 
+      files: selectedFiles.map(f => ({ name: f.name, size: f.size, path: f.path })),
+      devices: selectedDevices 
+    });
+
     setIsUploading(true);
     setUploadProgress({});
     setUploadETA({});
@@ -280,7 +285,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         targetPort = parseInt(port, 10);
       } else {
         targetIp = deviceId;
-        targetPort = 40124;
+        targetPort = 40123;
       }
 
       const deviceKey = `${targetIp}:${targetPort}`;
@@ -297,8 +302,16 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           const f = selectedFiles[i];
           const filePath = f.path || f.name;
           if (!f.path) {
-            console.warn('Path mancante per', f.name, '- prova a selezionare tramite pulsante Seleziona file');
+            console.warn('⚠️ [FileTransfer] Path mancante per', f.name, '- prova a selezionare tramite pulsante Seleziona file');
           }
+          
+          console.log(`📤 [FileTransfer] Invio file ${i+1}/${selectedFiles.length}:`, {
+            name: f.name,
+            size: f.size,
+            path: filePath,
+            target: `${targetIp}:${targetPort}`
+          });
+          
           // marca come in upload il file i
           currentFileIndexRef.current[deviceKey] = i;
           setFileProgress(prev => {
@@ -318,8 +331,10 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         }
         toast.success(t("transfer_success", { device: deviceKey }));
       } catch (err) {
-        console.error('Errore durante invio verso', deviceKey, err);
+        console.error('❌ [FileTransfer] Errore durante invio verso', deviceKey, err);
+        console.error('❌ [FileTransfer] Stack trace:', err);
         toast.error(t("transfer_error", { device: deviceKey }));
+        
         // marca corrente come errore
         const idx = currentFileIndexRef.current[deviceKey];
         if (typeof idx === 'number') {
@@ -328,6 +343,15 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             const existing = deviceMap[idx] || { percent: 0, status: 'uploading' as const };
             deviceMap[idx] = { ...existing, status: 'error' };
             return { ...prev, [deviceKey]: deviceMap };
+          });
+        }
+        
+        // Log dettagliato dell'errore per debug
+        if (err instanceof Error) {
+          console.error('❌ [FileTransfer] Error details:', {
+            message: err.message,
+            name: err.name,
+            stack: err.stack
           });
         }
       } finally {
@@ -390,7 +414,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             {selectedDevices.map(deviceId => {
               const device = allDevices.find(d => d.id === deviceId) ?? { name: "Dispositivo", ip: deviceId };
               const deviceTyped = device as Device & { ip: string; port?: number };
-              const key = `${deviceTyped.ip}:${deviceTyped.port ?? 40124}`;
+              const key = `${deviceTyped.ip}:${deviceTyped.port ?? 40123}`;
               const name = deviceTyped.name ?? "Dispositivo";
               const ip = deviceTyped.ip;
 

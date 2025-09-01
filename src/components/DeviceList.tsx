@@ -87,6 +87,13 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
           stability: d.stability !== undefined ? d.stability : 1,
         }));
 
+        console.log('🔍 [DeviceList] Mappatura dispositivi:', mappedDevices.map(d => ({
+          id: d.id,
+          name: d.name,
+          ip: d.ip,
+          type: d.type
+        })));
+
         const filteredDevices = mappedDevices.filter(device => device.airshareActive === true);
 
         console.log(`[DeviceList] Dispositivi dopo mapping (${mappedDevices.length}):`, mappedDevices);
