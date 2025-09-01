@@ -397,10 +397,7 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 warn!("({addr}) Failed to fsync file {:?}: {}", temp_path, e);
             }
 
-            app_handle.dialog().message(format!("✅ File '{}' ricevuto correttamente in '{}'", offer.file_name, save_dir.display()))
-                .title("AirShare - Trasferimento completato")
-                .kind(tauri_plugin_dialog::MessageDialogKind::Info)
-                .show(|_| {});
+            // Messaggio di dialogo rimosso per evitare popup agli utenti
 
             let _ = app_handle.emit("transfer_complete", serde_json::json!({
                 "transfer_id": transfer_id,
@@ -755,11 +752,6 @@ pub async fn send_file_with_progress(
             file_info
         )
     ).await;
-    // Mostra una finestra di dialogo come per la ricezione
-    let device_name = gethostname::gethostname().to_string_lossy().to_string();
-    app_handle.dialog().message(format!("✅ File '{}' inviato correttamente a {} ({})", actual_file_name, device_name, target_ip))
-        .title("AirShare - Trasferimento completato")
-        .kind(tauri_plugin_dialog::MessageDialogKind::Info)
-        .show(|_| {});
+    // Messaggio di dialogo rimosso per evitare popup agli utenti
     Ok(())
 }
