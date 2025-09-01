@@ -6,6 +6,7 @@ import { Waves, Zap } from 'lucide-react';
 import { TransferPrompt } from './components/TransferPrompt';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import './i18n';
+import { Toaster } from './components/ui/sonner';
 
 export default function App() {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
@@ -27,6 +28,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black relative overflow-hidden">
+      <Toaster richColors position="bottom-right" />
       {/* Animated background elements */}
       <div className="absolute inset-0">
         <div className="absolute top-10 left-10 w-32 h-32 bg-gray-700/10 rounded-full blur-xl animate-pulse" />
