@@ -39,11 +39,21 @@ jobs:
         with:
           targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
+      - name: add mac targets
+        if: matrix.os == 'macos-latest'
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+
       - name: cache cargo
         uses: Swatinem/rust-cache@v2
 
       - name: install frontend deps
         run: npm ci
+
+      - name: install nsis
+        if: matrix.os == 'windows-latest'
+        run: choco install nsis -y
 
 
       - name: build frontend
