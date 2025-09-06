@@ -60,7 +60,7 @@ jobs:
         run: npm run build
 
       - name: build tauri app
-        run: cargo tauri build ${{ matrix.args }}
+        run: npm run tauri build -- ${{ matrix.args }}
 
       - name: upload bundle
         uses: actions/upload-artifact@v4
