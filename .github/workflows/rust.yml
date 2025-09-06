@@ -62,6 +62,16 @@ jobs:
       - name: build tauri app
         run: npm run tauri build -- ${{ matrix.args }}
 
+      - name: rename Windows exe
+        if: matrix.os == 'windows-latest'
+        run: |
+          mv src-tauri/target/release/bundle/nsis/AirShare\ Setup.exe src-tauri/target/release/bundle/nsis/AirShare-Setup.exe
+
+      - name: rename macOS dmg
+        if: matrix.os == 'macos-latest'
+        run: |
+          mv src-tauri/target/${{ matrix.args }}/release/bundle/dmg/*.dmg src-tauri/target/${{ matrix.args }}/release/bundle/dmg/AirShare-${{ matrix.args == '--target aarch64-apple-darwin' && 'ARM64' || 'x86_64' }}.dmg
+
       - name: upload bundle Windows
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
