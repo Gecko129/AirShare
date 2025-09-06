@@ -42,16 +42,15 @@ jobs:
       - name: cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: install deps frontend
-        if: hashFiles('package.json') != ''
+      - name: install frontend deps
         run: npm ci
 
-      - name: build tauri
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: ${{ matrix.args }}
+
+      - name: build frontend
+        run: npm run build
+
+      - name: build tauri app
+        run: cargo tauri build ${{ matrix.args }}
 
       - name: upload bundle
         uses: actions/upload-artifact@v4
