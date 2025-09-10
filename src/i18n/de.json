@@ -33,5 +33,6 @@
   "transfer_start": "Starte Übertragung von {{fileCount}} Dateien an {{deviceCount}} Gerät(e)",
   "transfer_success": "Übertragung an {{device}} abgeschlossen",
   "transfer_error": "Fehler während der Übertragung an {{device}}",
-  "remove_everything": "Alles entfernen"
+  "remove_everything": "Alles entfernen",
+  "settings": "Einstellungen"
 }

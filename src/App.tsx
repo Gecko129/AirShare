@@ -2,14 +2,15 @@ import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { DeviceList } from './components/DeviceList';
 import { FileTransfer } from './components/FileTransfer';
-import { Waves, Zap } from 'lucide-react';
+import { Waves, Zap, Settings } from 'lucide-react';
 import { TransferPrompt } from './components/TransferPrompt';
-import LanguageSwitcher from './components/LanguageSwitcher';
+import SettingsPanel from './components/SettingsPanel';
 import './i18n';
 import { Toaster } from './components/ui/sonner';
 
 export default function App() {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const { t } = useTranslation();
 
@@ -119,10 +120,17 @@ export default function App() {
         </div>
       </div>
       <TransferPrompt />
-      {/* Language Switcher - fixed bottom left */}
-      <div className="fixed bottom-4 left-4 z-50">
-        <LanguageSwitcher />
-      </div>
+      {/* Settings gear - fixed bottom left */}
+      <button
+        aria-label="Apri impostazioni"
+        className="fixed bottom-4 left-4 z-50 inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white shadow"
+        onClick={() => setSettingsOpen(true)}
+      >
+        <Settings className="w-5 h-5" />
+      </button>
+
+      {/* Settings Panel */}
+      <SettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }
