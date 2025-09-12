@@ -88,6 +88,9 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
       });
 
       // Log backend_log events to console and aggiorna progress da stringa
+  // Funzione aggiornata per rispondere a una richiesta di trasferimento
+  // (ad esempio: accettare/rifiutare un file in ricezione)
+  // invoke('respond_transfer', { transfer_id: ..., accept: ... })
       unlistenBackendLog = await listen('backend_log', (event: { payload: any }) => {
         const p = event.payload as any;
         const level = p?.level ?? 'info';
@@ -677,3 +680,5 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     </Card>
   );
 }
+  // Esempio di chiamata a respond_transfer (aggiorna argomento transferId → transfer_id):
+  // await invoke('respond_transfer', { transfer_id: transferId, accept });
