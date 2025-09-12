@@ -225,45 +225,66 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 }),
             );
 
-            // Attendi risposta dal frontend tramite mappa condivisa
-            let accept = loop {
-                {
-                    let map = TRANSFER_RESPONSES.lock().await;
-                    if let Some(&accept) = map.get(&transfer_id) {
-                        break accept;
+            // Attendi risposta dal frontend tramite mappa condivisa, con timeout.
+            let timeout_duration = Duration::from_secs(15);
+            info!("({addr}) Waiting up to {}s for transfer response from frontend for transfer_id={}", timeout_duration.as_secs(), transfer_id);
+            tauri_log(&app_handle, "info", format!("Waiting for frontend response for transfer_id={} (timeout {}s)", transfer_id, timeout_duration.as_secs())).await;
+            let accept = match timeout(timeout_duration, async {
+                loop {
+                    {
+                        let map = TRANSFER_RESPONSES.lock().await;
+                        if let Some(&accept) = map.get(&transfer_id) {
+                            break accept;
+                        }
                     }
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 }
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }).await {
+                Ok(val) => val,
+                Err(_) => {
+                    warn!("({addr}) Timeout waiting for frontend response for transfer_id={}", transfer_id);
+                    tauri_log(&app_handle, "warn", format!("Timeout waiting for frontend response for transfer_id={}", transfer_id)).await;
+                    false
+                }
             };
             // Rimuovi la decisione dalla mappa per evitare leak
             {
                 let mut map = TRANSFER_RESPONSES.lock().await;
                 map.remove(&transfer_id);
             }
-            // Send ack JSON (expanded for potential error reporting)
+            // Logging ack decision
+            if accept {
+                info!("({addr}) Transfer accepted by frontend for transfer_id={}", transfer_id);
+                tauri_log(&app_handle, "info", format!("Frontend accepted transfer_id={}", transfer_id)).await;
+            } else {
+                info!("({addr}) Transfer rejected or timed out for transfer_id={}", transfer_id);
+                tauri_log(&app_handle, "info", format!("Frontend rejected/timed out transfer_id={}", transfer_id)).await;
+            }
+
+            // Invia ack TCP immediatamente al mittente
             let ack = if accept {
                 serde_json::json!({ "accept": true })
             } else {
-                serde_json::json!({ "accept": false, "error": "user_rejected" })
+                serde_json::json!({ "accept": false, "error": if accept { "user_rejected" } else { "timeout_or_rejected" } })
             };
             let ack_str = serde_json::to_string(&ack).unwrap() + "\n";
             match socket.write_all(ack_str.as_bytes()).await {
                 Ok(_) => {
-                    info!("({addr}) Sent ack to client: {}", ack_str.trim_end());
-                    tauri_log(&app_handle, "info", format!("Sent ack to {} for transfer {}", addr, transfer_id)).await;
+                    info!("({addr}) Sent ack to client for transfer_id={}: {}", transfer_id, ack_str.trim_end());
+                    tauri_log(&app_handle, "info", format!("Sent ack to {} for transfer {}: {}", addr, transfer_id, ack_str.trim_end())).await;
                     if let Err(e) = socket.flush().await {
-                        warn!("({addr}) Flush after ack failed: {}", e);
+                        warn!("({addr}) Flush after ack failed for transfer_id={}: {}", transfer_id, e);
                         tauri_log(&app_handle, "warn", format!("Flush after ack failed for {}: {}", addr, e)).await;
                     }
                 }
                 Err(e) => {
-                    error!("({addr}) Failed to write ack: {}", e);
-                    tauri_log(&app_handle, "error", format!("Failed to write ack to {}: {}", addr, e)).await;
+                    error!("({addr}) Failed to write ack for transfer_id={}: {}", transfer_id, e);
+                    tauri_log(&app_handle, "error", format!("Failed to write ack to {} for transfer {}: {}", addr, transfer_id, e)).await;
                     return;
                 }
             }
             if !accept {
-                info!("({addr}) Transfer rejected by user.");
+                info!("({addr}) Transfer rejected or timed out for transfer_id={}. Closing connection.", transfer_id);
                 return;
             }
 

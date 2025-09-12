@@ -680,5 +680,3 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     </Card>
   );
 }
-  // Esempio di chiamata a respond_transfer (aggiorna argomento transferId → transfer_id):
-  // await invoke('respond_transfer', { transfer_id: transferId, accept });
