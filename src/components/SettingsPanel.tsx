@@ -16,7 +16,7 @@ export default function SettingsPanel({ open, onOpenChange }: SettingsPanelProps
         className="bg-slate-900 border-r border-slate-800 text-white p-4 w-full sm:max-w-sm data-[state=open]:animate-slide-in-from-left data-[state=closed]:animate-slide-out-to-left"
       >
         <SheetHeader className="pb-2">
-          <SheetTitle className="text-white text-xl text-center">{t("settings")}</SheetTitle>
+          <SheetTitle className="text-white text-3xl text-center bg-transparent">{t("settings")}</SheetTitle>
         </SheetHeader>
 
         {/* Contenuto pannello */}

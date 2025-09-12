@@ -1,7 +1,7 @@
 {
   "name": "AirShare",
   "private": true,
-  "version": "1.0.0-beta.1",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
