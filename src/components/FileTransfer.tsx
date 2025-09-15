@@ -88,9 +88,6 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
       });
 
       // Log backend_log events to console and aggiorna progress da stringa
-  // Funzione aggiornata per rispondere a una richiesta di trasferimento
-  // (ad esempio: accettare/rifiutare un file in ricezione)
-  // invoke('respond_transfer', { transfer_id: ..., accept: ... })
       unlistenBackendLog = await listen('backend_log', (event: { payload: any }) => {
         const p = event.payload as any;
         const level = p?.level ?? 'info';
