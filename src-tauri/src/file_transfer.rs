@@ -18,12 +18,19 @@ use tokio::sync::Mutex as TokioMutex;
 
 // Global shared state for transfer responses
 static TRANSFER_RESPONSES: Lazy<TokioMutex<HashMap<String, bool>>> = Lazy::new(|| TokioMutex::new(HashMap::new()));
-/// Respond to a transfer request from the frontend.
-#[allow(dead_code)]
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RespondTransferArgs {
+    #[serde(alias = "transfer_id")]
+    pub transfer_id: String,
+    pub accept: bool,
+}
+
 #[tauri::command]
-pub async fn respond_transfer(transfer_id: String, accept: bool) {
+pub async fn respond_transfer(args: RespondTransferArgs) {
     let mut map = TRANSFER_RESPONSES.lock().await;
-    map.insert(transfer_id, accept);
+    map.insert(args.transfer_id, args.accept);
 }
 use dirs;
 use tauri::AppHandle;

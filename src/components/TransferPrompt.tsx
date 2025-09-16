@@ -32,6 +32,7 @@ export function TransferPrompt() {
     if (!transfer) return;
     await invoke("respond_transfer", {
       transferId: transfer.transfer_id || transfer.id,
+      transfer_id: transfer.transfer_id || transfer.id,
       accept,
     });
     setOpen(false);
