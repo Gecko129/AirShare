@@ -74,7 +74,7 @@ jobs:
         if: matrix.args == '--target aarch64-unknown-linux-gnu'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu pkg-config-aarch64-linux-gnu
+          sudo apt-get install -y gcc-aarch64-linux-gnu
 
 
       - name: build frontend
@@ -84,7 +84,7 @@ jobs:
         run: npm run tauri build -- ${{ matrix.args }}
         env:
           PKG_CONFIG_ALLOW_CROSS: ${{ matrix.args == '--target aarch64-unknown-linux-gnu' && '1' || '' }}
-          PKG_CONFIG: ${{ matrix.args == '--target aarch64-unknown-linux-gnu' && 'aarch64-linux-gnu-pkg-config' || '' }}
+          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig:/usr/lib/pkgconfig
 
       - name: upload bundle Windows
         if: matrix.os == 'windows-latest'
