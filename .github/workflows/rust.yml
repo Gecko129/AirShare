@@ -74,11 +74,19 @@ jobs:
         if: matrix.args == '--target aarch64-unknown-linux-gnu'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          mkdir -p .cargo
+          echo '[target.aarch64-unknown-linux-gnu]' > .cargo/config.toml
+          echo 'linker = "aarch64-linux-gnu-gcc"' >> .cargo/config.toml
+          echo 'ar = "aarch64-linux-gnu-ar"' >> .cargo/config.toml
 
 
       - name: build frontend
         run: npm run build
+
+      - name: ensure bundle_dmg.sh is executable (macOS x86_64)
+        if: matrix.os == 'macos-latest' && matrix.args == '--target x86_64-apple-darwin'
+        run: chmod +x src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/bundle_dmg.sh
 
       - name: build tauri app
         run: npm run tauri build -- ${{ matrix.args }}
@@ -105,7 +113,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AirShare-x86_64.dmg
-          path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+          path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/AirShare_0.3.1_x64.dmg
 
       - name: upload bundle Linux
         if: matrix.os == 'ubuntu-latest' && matrix.args == ''
