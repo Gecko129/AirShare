@@ -31,9 +31,12 @@ export function TransferPrompt() {
   const handleResponse = async (accept: boolean) => {
     if (!transfer) return;
     try {
+      // Correzione: usa la struttura corretta dei parametri
       await invoke("respond_transfer", {
-        transferId: transfer.transfer_id || transfer.id,
-        accept,
+        args: {
+          transfer_id: transfer.offer?.transfer_id || transfer.transfer_id || transfer.id,
+          accept,
+        }
       });
     } catch (error) {
       console.error("Errore durante la risposta al trasferimento:", error);
@@ -111,4 +114,3 @@ export function TransferPrompt() {
     </AlertDialog>
   );
 }
-
