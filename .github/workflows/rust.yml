@@ -84,9 +84,6 @@ jobs:
       - name: build frontend
         run: npm run build
 
-      - name: ensure bundle_dmg.sh is executable (macOS x86_64)
-        if: matrix.os == 'macos-latest' && matrix.args == '--target x86_64-apple-darwin'
-        run: chmod +x src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/bundle_dmg.sh
 
       - name: build tauri app
         run: npm run tauri build -- ${{ matrix.args }}
