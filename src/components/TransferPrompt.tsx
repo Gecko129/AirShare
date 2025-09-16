@@ -32,8 +32,10 @@ export function TransferPrompt() {
     if (!transfer) return;
     try {
       await invoke("respond_transfer", {
-        transferId: transfer.transfer_id || transfer.id,
-        accept,
+        args: {
+          transferId: transfer.transfer_id || transfer.id,
+          accept,
+        },
       });
     } catch (error) {
       console.error("Errore durante la risposta al trasferimento:", error);
