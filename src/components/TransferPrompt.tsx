@@ -34,10 +34,6 @@ export function TransferPrompt() {
       transferId: transfer.transfer_id || transfer.id,
       accept,
     });
-    await invoke("respond_transfer", {
-      transfer_id: transfer.transfer_id || transfer.id,
-      accept,
-    });
     setOpen(false);
     setTransfer(null);
   };
