@@ -31,9 +31,11 @@ export function TransferPrompt() {
   const handleResponse = async (accept: boolean) => {
     if (!transfer) return;
     await invoke("respond_transfer", {
-      transferId: transfer.transfer_id || transfer.id,
-      transfer_id: transfer.transfer_id || transfer.id,
-      accept,
+      args: {
+        transferId: transfer.transfer_id || transfer.id,
+        transfer_id: transfer.transfer_id || transfer.id,
+        accept,
+      },
     });
     setOpen(false);
     setTransfer(null);
