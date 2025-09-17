@@ -390,6 +390,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
       }));
 
       try {
+        // Calcola la dimensione totale di tutti i file UNA SOLA VOLTA per batch
+        const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
         for (let i = 0; i < selectedFiles.length; i++) {
           const f = selectedFiles[i];
           const filePath = f.path || f.name;
@@ -397,17 +399,10 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             console.warn('⚠️ [FileTransfer] Path mancante per', f.name, '- prova a selezionare tramite pulsante Seleziona file');
           }
 
-          console.log(`📤 [FileTransfer] Invio file ${i + 1}/${selectedFiles.length}:`, {
-            name: f.name,
-            size: f.size,
-            path: filePath,
-            target: `${targetIp}:${targetPort}`,
-            deviceKey,
-            batchId
-          });
-
-          // Calcola la dimensione totale di tutti i file
-          const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+          // Log con batchId, deviceKey, fileIndex, fileName
+          console.log(
+            `[FileTransfer] Invio file (batchId=${batchId}, deviceKey=${deviceKey}, fileIndex=${i}, fileName=${f.name})`
+          );
 
           await invoke('send_file_with_progress', {
             ip: targetIp,
