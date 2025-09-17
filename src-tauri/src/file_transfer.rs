@@ -486,21 +486,41 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
 }
 
 /// Send a file to a peer over TCP.
-pub async fn send_file(target_ip: String, target_port: u16, path: PathBuf, app_handle: tauri::AppHandle) -> anyhow::Result<()> {
-    send_file_with_progress(target_ip, target_port, path, app_handle, None, None, None, None, None).await
+/// Optionally accepts a batch_id to group multiple files in a batch transfer.
+pub async fn send_file(
+    target_ip: String,
+    target_port: u16,
+    path: PathBuf,
+    app_handle: tauri::AppHandle,
+    batch_id: Option<String>,
+) -> anyhow::Result<()> {
+    send_file_with_progress(
+        target_ip,
+        target_port,
+        path,
+        app_handle,
+        None,
+        None,
+        None,
+        None,
+        None,
+        batch_id,
+    ).await
 }
 
 /// Send a file to a peer over TCP with progress information.
+/// Optionally accepts a batch_id to group multiple files in a batch transfer.
 pub async fn send_file_with_progress(
-    target_ip: String, 
-    target_port: u16, 
-    path: PathBuf, 
+    target_ip: String,
+    target_port: u16,
+    path: PathBuf,
     app_handle: tauri::AppHandle,
     file_index: Option<usize>,
     total_files: Option<usize>,
     file_name: Option<String>,
     overall_sent: Option<std::sync::Arc<TokioMutex<u64>>>,
-    overall_total: Option<u64>
+    overall_total: Option<u64>,
+    batch_id: Option<String>,
 ) -> anyhow::Result<()> {
     let default_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string();
     let display_name = file_name.as_ref().unwrap_or(&default_name);
@@ -517,13 +537,12 @@ pub async fn send_file_with_progress(
     let actual_file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string();
     let mime = mime_guess::from_path(&path).first_or_octet_stream().to_string();
     let transfer_id = Uuid::new_v4().to_string();
-    let batch_id = None; // Nessun batch_id fornito in questa funzione
     let offer = FileOffer {
         transfer_id: transfer_id.clone(),
         file_name: actual_file_name.clone(),
         file_size,
         mime,
-        batch_id,
+        batch_id: batch_id.clone(),
         sha256: None,
     };
     let addr = format!("{}:{}", target_ip, target_port);
