@@ -222,6 +222,10 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                     return;
                 }
             };
+            info!(
+                "[RECV] Parsed FileOffer | transfer_id={} batch_id={:?} file_name={}",
+                offer.transfer_id, offer.batch_id, offer.file_name
+            );
             // Determine batch_id (use transfer_id if not present)
             let batch_id = offer.batch_id.clone().unwrap_or_else(|| offer.transfer_id.clone());
             info!("({addr}) Parsed file offer: {:?}, batch_id: {}", offer, batch_id);
@@ -544,14 +548,20 @@ pub async fn send_file_with_progress(
     let actual_file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string();
     let mime = mime_guess::from_path(&path).first_or_octet_stream().to_string();
     let transfer_id = Uuid::new_v4().to_string();
-    let offer = FileOffer {
-        transfer_id: transfer_id.clone(),
-        file_name: actual_file_name.clone(),
-        file_size,
-        mime,
-        batch_id: batch_id.clone(),
-        sha256: None,
-    };
+// Assicura che il batch_id venga usato esattamente come passato dal frontend
+let offer = FileOffer {
+    transfer_id: transfer_id.clone(),
+    file_name: actual_file_name.clone(),
+    file_size,
+    mime,
+    batch_id: batch_id.clone(), // ← usa quello ricevuto
+    sha256: None,
+};
+
+info!(
+    "[SEND] Created FileOffer | transfer_id={} batch_id={:?} file_name={}",
+    transfer_id, batch_id, actual_file_name
+);
     let addr = format!("{}:{}", target_ip, target_port);
     info!("Connecting to target address: {}", addr);
     tauri_log(&app_handle, "info", format!("Connecting to {}", addr)).await;
