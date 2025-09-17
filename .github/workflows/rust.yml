@@ -73,7 +73,7 @@ jobs:
           echo "NPM version: $(npm --version)"
           
           # Setup Rust se non presente o sbagliato
-          if ! command -v cargo &> /dev/null || [[ "$(file ~/.cargo/bin/cargo)" == "x86-64" ]]; then
+          if ! command -v cargo &> /dev/null || file ~/.cargo/bin/cargo | grep -q "x86-64"; then
             echo "Installing/fixing Rust for ARM64..."
             rustup self uninstall -y 2>/dev/null || true
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -104,12 +104,14 @@ jobs:
           lto = "thin"
           codegen-units = 1
           EOF
+        shell: bash
 
       - name: add mac targets
         if: matrix.os == 'macos-latest'
         run: |
           rustup target add aarch64-apple-darwin
           rustup target add x86_64-apple-darwin
+        shell: bash
 
       - name: cache cargo (non self-hosted)
         if: matrix.os != '[self-hosted, ARM64, Linux]'
@@ -124,10 +126,12 @@ jobs:
           mkdir -p ~/.cargo/registry/src
           mkdir -p ~/.cargo/git/db
           echo "Cargo cache directory prepared"
+        shell: bash
 
       - name: install frontend deps (non self-hosted)
         if: matrix.os != '[self-hosted, ARM64, Linux]'
         run: npm ci
+        shell: bash
 
       - name: install frontend deps (self-hosted)
         if: contains(matrix.os, 'self-hosted')
@@ -142,6 +146,7 @@ jobs:
           npm install
           
           echo "Frontend dependencies installed with ARM64 Node.js"
+        shell: bash
 
       - name: install nsis
         if: matrix.os == 'windows-latest'
@@ -152,6 +157,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev
+        shell: bash
 
       - name: install linux deps (self-hosted ARM64)
         if: contains(matrix.os, 'self-hosted')
@@ -168,18 +174,20 @@ jobs:
             libjavascriptcoregtk-4.1-dev \
             libssl-dev \
             pkg-config
+        shell: bash
 
       - name: build frontend
         run: |
-          if [[ "${{ matrix.os }}" == "self-hosted" ]]; then
+          if [ "${{ matrix.os }}" = "self-hosted" ]; then
             export PATH="/usr/bin:$PATH"
             export NODE_OPTIONS="--max-old-space-size=3072"
           fi
           npm run build
+        shell: bash
 
       - name: build tauri app
         run: |
-          if [[ "${{ matrix.os }}" == "self-hosted" ]]; then
+          if [ "${{ matrix.os }}" = "self-hosted" ]; then
             source ~/.cargo/env
             export PATH="$HOME/.cargo/bin:/usr/bin:$PATH"
             export NODE_OPTIONS="--max-old-space-size=3072"
@@ -196,6 +204,7 @@ jobs:
           fi
         env:
           PKG_CONFIG_ALLOW_CROSS: ${{ contains(matrix.args, 'aarch64-unknown-linux-gnu') && '1' || '' }}
+        shell: bash
 
       - name: upload bundle Windows
         if: matrix.os == 'windows-latest'
