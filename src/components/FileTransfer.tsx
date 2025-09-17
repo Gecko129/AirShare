@@ -327,12 +327,25 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     }
   };
 
+  // Utility per generare un batchId univoco
+  function generateBatchId() {
+    // Usa crypto.randomUUID se disponibile, altrimenti fallback su timestamp e random
+    if (typeof crypto !== "undefined" && typeof (crypto as any).randomUUID === "function") {
+      return (crypto as any).randomUUID();
+    }
+    return `batch_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+  }
+
   const handleSend = async () => {
     if (selectedFiles.length === 0 || selectedDevices.length === 0) return;
 
+    // Genera un batchId univoco per questo invio
+    const batchId = generateBatchId();
+
     console.log("🚀 [FileTransfer] Inizio invio:", { 
       files: selectedFiles.map(f => ({ name: f.name, size: f.size, path: f.path })),
-      devices: selectedDevices 
+      devices: selectedDevices,
+      batchId
     });
 
     setIsUploading(true);
@@ -389,7 +402,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             size: f.size,
             path: filePath,
             target: `${targetIp}:${targetPort}`,
-            deviceKey
+            deviceKey,
+            batchId
           });
 
           // Calcola la dimensione totale di tutti i file
@@ -402,7 +416,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             fileIndex: i,
             totalFiles: selectedFiles.length,
             fileName: f.name,
-            totalSize: totalSize
+            totalSize: totalSize,
+            batchId: batchId
           });
         }
         toast.success(t("transfer_success", { device: deviceKey }));

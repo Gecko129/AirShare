@@ -235,9 +235,13 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             {
                 let map = BATCH_RESPONSES.lock().await;
                 if let Some((a, d)) = map.get(&batch_id) {
+                    info!("({addr}) Batch already exists for batch_id: {}. Using existing response.", batch_id);
+                    tauri_log(&app_handle, "info", format!("Batch already exists for batch_id: {}. Using existing response.", batch_id)).await;
                     accept = *a;
                     save_dir = d.clone();
                 } else {
+                    info!("({addr}) No existing batch for batch_id: {}. New batch will be created.", batch_id);
+                    tauri_log(&app_handle, "info", format!("No existing batch for batch_id: {}. New batch will be created.", batch_id)).await;
                     is_batch_first = true;
                     accept = false; // to be set below
                     save_dir = None;
@@ -256,6 +260,8 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                         "direction": "receive"
                     }),
                 );
+                info!("({addr}) Waiting for user confirmation for transfer_id: {}", transfer_id);
+                tauri_log(&app_handle, "info", format!("Waiting for user confirmation for transfer_id: {}", transfer_id)).await;
                 // Wait for user response
                 accept = loop {
                     let map = TRANSFER_RESPONSES.lock().await;
@@ -265,6 +271,8 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                     drop(map);
                     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 };
+                info!("({addr}) User responded with accept = {} for transfer_id: {}", accept, transfer_id);
+                tauri_log(&app_handle, "info", format!("User responded with accept = {} for transfer_id: {}", accept, transfer_id)).await;
                 // Remove transfer_id from TRANSFER_RESPONSES
                 {
                     let mut map = TRANSFER_RESPONSES.lock().await;
@@ -285,6 +293,8 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                                 *result = path.and_then(|p| p.as_path().map(|path| PathBuf::from(path)));
                             });
                         });
+                    info!("({addr}) Waiting for user to select destination folder for batch_id: {}", batch_id);
+                    tauri_log(&app_handle, "info", format!("Waiting for user to select destination folder for batch_id: {}", batch_id)).await;
                     // Aspetta che l'utente selezioni una cartella (con timeout)
                     let chosen_dir = loop {
                         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -294,11 +304,15 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                         }
                     };
                     save_dir = chosen_dir;
+                    info!("({addr}) User selected destination folder for batch_id: {}: {:?}", batch_id, save_dir);
+                    tauri_log(&app_handle, "info", format!("User selected destination folder for batch_id: {}: {:?}", batch_id, save_dir)).await;
                 }
                 // Save to BATCH_RESPONSES (even if rejected, to avoid repeated asks)
                 {
                     let mut map = BATCH_RESPONSES.lock().await;
                     map.insert(batch_id.clone(), (accept, save_dir.clone()));
+                    info!("({addr}) Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir);
+                    tauri_log(&app_handle, "info", format!("Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir)).await;
                 }
             }
             // Send ack JSON (expanded for potential error reporting)
