@@ -231,17 +231,17 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             let mut accept: bool;
             let mut save_dir: Option<PathBuf>;
             let mut is_batch_first = false;
-            // Check if batch_id already present in map
+            // --- PATCH: Check BATCH_RESPONSES with exact batch_id before asking frontend ---
             {
                 let map = BATCH_RESPONSES.lock().await;
                 if let Some((a, d)) = map.get(&batch_id) {
-                    info!("({addr}) Batch already exists for batch_id: {}. Using existing response.", batch_id);
-                    tauri_log(&app_handle, "info", format!("Batch already exists for batch_id: {}. Using existing response.", batch_id)).await;
+                    info!("({addr}) [BATCH] Existing batch_id {} found. Reusing accept/dir for new connection.", batch_id);
+                    tauri_log(&app_handle, "info", format!("[BATCH] Existing batch_id {} found. Reusing accept/dir for new connection from {}.", batch_id, addr)).await;
                     accept = *a;
                     save_dir = d.clone();
                 } else {
-                    info!("({addr}) No existing batch for batch_id: {}. New batch will be created.", batch_id);
-                    tauri_log(&app_handle, "info", format!("No existing batch for batch_id: {}. New batch will be created.", batch_id)).await;
+                    info!("({addr}) [BATCH] No entry for batch_id {}. Asking user for confirmation/folder.", batch_id);
+                    tauri_log(&app_handle, "info", format!("[BATCH] No entry for batch_id {}. Asking user for confirmation/folder from {}.", batch_id, addr)).await;
                     is_batch_first = true;
                     accept = false; // to be set below
                     save_dir = None;
@@ -311,8 +311,8 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 {
                     let mut map = BATCH_RESPONSES.lock().await;
                     map.insert(batch_id.clone(), (accept, save_dir.clone()));
-                    info!("({addr}) Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir);
-                    tauri_log(&app_handle, "info", format!("Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir)).await;
+                    info!("({addr}) [BATCH] Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir);
+                    tauri_log(&app_handle, "info", format!("[BATCH] Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir)).await;
                 }
             }
             // Send ack JSON (expanded for potential error reporting)
@@ -480,15 +480,8 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             info!("({addr}) File transfer complete: {:?}", temp_path);
             tauri_log(&app_handle, "info", format!("receive complete | id={} ip={} port={} path={}", transfer_id, addr.ip(), addr.port(), temp_path.display())).await;
 
-            // If this is the last file of the batch, remove entry from BATCH_RESPONSES.
-            // We do not have batch size info here, so expect batch sender to close connection after last file.
-            // Remove the batch entry to avoid leaks.
-            if is_batch_first {
-                // If this was the first in batch, we leave entry for the rest; otherwise, remove only at end.
-                // But for safety, always remove after transfer (could be improved with batch tracking).
-                let mut map = BATCH_RESPONSES.lock().await;
-                map.remove(&batch_id);
-            }
+            // --- PATCH: Do NOT remove batch entry here. Removal must be done only when all files in the batch are complete. ---
+            // The entry for batch_id will persist until explicit cleanup logic is added (not here).
 
             // Gracefully shutdown write half (if any) to signal proper end
             if let Err(e) = AsyncWriteExt::shutdown(&mut socket).await {
