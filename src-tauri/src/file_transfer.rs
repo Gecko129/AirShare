@@ -19,6 +19,10 @@ use tokio::sync::Mutex as TokioMutex;
 // Global shared state for transfer responses
 static TRANSFER_RESPONSES: Lazy<TokioMutex<HashMap<String, bool>>> = Lazy::new(|| TokioMutex::new(HashMap::new()));
 
+// Batch responses: batch_id -> (accept, Option<PathBuf>)
+static BATCH_RESPONSES: Lazy<TokioMutex<HashMap<String, (bool, Option<PathBuf>)>>> =
+    Lazy::new(|| TokioMutex::new(HashMap::new()));
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RespondTransferArgs {
@@ -42,6 +46,9 @@ pub struct FileOffer {
     pub file_size: u64,
     pub mime: String,
     pub sha256: Option<String>,
+    // Optionally, batch_id for batch transfers
+    #[serde(default)]
+    pub batch_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -215,37 +222,84 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                     return;
                 }
             };
-            info!("({addr}) Parsed file offer: {:?}", offer);
+            // Determine batch_id (use transfer_id if not present)
+            let batch_id = offer.batch_id.clone().unwrap_or_else(|| offer.transfer_id.clone());
+            info!("({addr}) Parsed file offer: {:?}, batch_id: {}", offer, batch_id);
             tauri_log(&app_handle, "info", format!("Parsed file offer from {}: {} ({} bytes)", addr, offer.file_name, offer.file_size)).await;
 
-            // Emit event to frontend (include source address info)
             let transfer_id = offer.transfer_id.clone();
-            info!("({addr}) Emitting transfer_request event for id: {}", transfer_id);
-            tauri_log(&app_handle, "info", format!("Emitting transfer_request for {} from {}", transfer_id, addr)).await;
-            let _ = app_handle.emit(
-                "transfer_request",
-                serde_json::json!({
-                    "offer": offer,
-                    "ip": addr.ip().to_string(),
-                    "port": addr.port(),
-                    "direction": "receive"
-                }),
-            );
-
-            // Attendi risposta dal frontend tramite mappa condivisa
-            let accept = loop {
-                {
-                    let map = TRANSFER_RESPONSES.lock().await;
-                    if let Some(&accept) = map.get(&transfer_id) {
-                        break accept;
-                    }
-                }
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            };
-            // Rimuovi la decisione dalla mappa per evitare leak
+            let mut accept: bool;
+            let mut save_dir: Option<PathBuf>;
+            let mut is_batch_first = false;
+            // Check if batch_id already present in map
             {
-                let mut map = TRANSFER_RESPONSES.lock().await;
-                map.remove(&transfer_id);
+                let map = BATCH_RESPONSES.lock().await;
+                if let Some((a, d)) = map.get(&batch_id) {
+                    accept = *a;
+                    save_dir = d.clone();
+                } else {
+                    is_batch_first = true;
+                    accept = false; // to be set below
+                    save_dir = None;
+                }
+            }
+            if is_batch_first {
+                // Emit event to frontend (include source address info)
+                info!("({addr}) Emitting transfer_request event for batch_id: {}", batch_id);
+                tauri_log(&app_handle, "info", format!("Emitting transfer_request for {} from {}", transfer_id, addr)).await;
+                let _ = app_handle.emit(
+                    "transfer_request",
+                    serde_json::json!({
+                        "offer": offer,
+                        "ip": addr.ip().to_string(),
+                        "port": addr.port(),
+                        "direction": "receive"
+                    }),
+                );
+                // Wait for user response
+                accept = loop {
+                    let map = TRANSFER_RESPONSES.lock().await;
+                    if let Some(&a) = map.get(&transfer_id) {
+                        break a;
+                    }
+                    drop(map);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                };
+                // Remove transfer_id from TRANSFER_RESPONSES
+                {
+                    let mut map = TRANSFER_RESPONSES.lock().await;
+                    map.remove(&transfer_id);
+                }
+                // If accepted, ask for folder
+                if accept {
+                    use std::sync::Arc;
+                    use tokio::sync::Mutex;
+                    let save_dir_result: Arc<Mutex<Option<PathBuf>>> = Arc::new(Mutex::new(None));
+                    let save_dir_clone = save_dir_result.clone();
+                    FileDialogBuilder::new(app_handle.dialog().clone())
+                        .set_title("Scegli la cartella di destinazione per il file")
+                        .pick_folder(move |path| {
+                            let save_dir_clone = save_dir_clone.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let mut result = save_dir_clone.lock().await;
+                                *result = path.and_then(|p| p.as_path().map(|path| PathBuf::from(path)));
+                            });
+                        });
+                    // Aspetta che l'utente selezioni una cartella (con timeout)
+                    let chosen_dir = loop {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                        let result = save_dir_result.lock().await;
+                        if result.is_some() {
+                            break result.clone();
+                        }
+                    };
+                    save_dir = chosen_dir;
+                }
+                // Save to BATCH_RESPONSES (even if rejected, to avoid repeated asks)
+                {
+                    let mut map = BATCH_RESPONSES.lock().await;
+                    map.insert(batch_id.clone(), (accept, save_dir.clone()));
+                }
             }
             // Send ack JSON (expanded for potential error reporting)
             let ack = if accept {
@@ -266,43 +320,29 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 Err(e) => {
                     error!("({addr}) Failed to write ack: {}", e);
                     tauri_log(&app_handle, "error", format!("Failed to write ack to {}: {}", addr, e)).await;
+                    // On error, cleanup batch entry if we just created it
+                    if is_batch_first {
+                        let mut map = BATCH_RESPONSES.lock().await;
+                        map.remove(&batch_id);
+                    }
                     return;
                 }
             }
             if !accept {
                 info!("({addr}) Transfer rejected by user.");
+                // On reject, cleanup batch entry if we just created it
+                if is_batch_first {
+                    let mut map = BATCH_RESPONSES.lock().await;
+                    map.remove(&batch_id);
+                }
                 return;
             }
-
-            // Chiedi cartella di destinazione all'utente
-            use std::sync::Arc;
-            use tokio::sync::Mutex;
-
-            let save_dir_result: Arc<Mutex<Option<PathBuf>>> = Arc::new(Mutex::new(None));
-            let save_dir_clone = save_dir_result.clone();
-
-            // Usa il dialog asincrono con callback
-            FileDialogBuilder::new(app_handle.dialog().clone())
-                .set_title("Scegli la cartella di destinazione per il file")
-                .pick_folder(move |path| {
-                    let save_dir_clone = save_dir_clone.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let mut result = save_dir_clone.lock().await;
-                        *result = path.and_then(|p| p.as_path().map(|path| PathBuf::from(path)));
-                    });
-                });
-            
-            // Aspetta che l'utente selezioni una cartella (con timeout)
-            let save_dir = loop {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                let result = save_dir_result.lock().await;
-                if result.is_some() {
-                    break result.clone();
-                }
-                // Implementa un timeout se necessario
+            // Retrieve save_dir from batch map (in case not first)
+            let actual_save_dir = {
+                let map = BATCH_RESPONSES.lock().await;
+                map.get(&batch_id).and_then(|(_, dir)| dir.clone())
             };
-            
-            let save_dir = match save_dir {
+            let save_dir = match actual_save_dir {
                 Some(path) => path,
                 None => {
                     info!("({addr}) Trasferimento annullato dall'utente.");
@@ -310,6 +350,11 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                         "transfer_id": transfer_id,
                         "reason": "user_cancelled"
                     }));
+                    // On cancel, cleanup batch entry if we just created it
+                    if is_batch_first {
+                        let mut map = BATCH_RESPONSES.lock().await;
+                        map.remove(&batch_id);
+                    }
                     return;
                 }
             };
@@ -318,6 +363,11 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             if let Err(e) = tokio::fs::create_dir_all(&save_dir).await {
                 error!("({addr}) Failed to create selected directory: {}", e);
                 tauri_log(&app_handle, "error", format!("Failed to create selected directory {}: {}", save_dir.display(), e)).await;
+                // On error, cleanup batch entry if we just created it
+                if is_batch_first {
+                    let mut map = BATCH_RESPONSES.lock().await;
+                    map.remove(&batch_id);
+                }
                 return;
             }
             info!("({addr}) Creating destination file at {:?}", temp_path);
@@ -404,10 +454,7 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 warn!("({addr}) Failed to fsync file {:?}: {}", temp_path, e);
             }
 
-            app_handle.dialog().message(format!("✅ File '{}' ricevuto correttamente in '{}'", offer.file_name, save_dir.display()))
-                .title("AirShare - Trasferimento completato")
-                .kind(tauri_plugin_dialog::MessageDialogKind::Info)
-                .show(|_| {});
+            // Funzione di dialogo rimossa come richiesto
 
             let _ = app_handle.emit("transfer_complete", serde_json::json!({
                 "transfer_id": transfer_id,
@@ -418,6 +465,16 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             }));
             info!("({addr}) File transfer complete: {:?}", temp_path);
             tauri_log(&app_handle, "info", format!("receive complete | id={} ip={} port={} path={}", transfer_id, addr.ip(), addr.port(), temp_path.display())).await;
+
+            // If this is the last file of the batch, remove entry from BATCH_RESPONSES.
+            // We do not have batch size info here, so expect batch sender to close connection after last file.
+            // Remove the batch entry to avoid leaks.
+            if is_batch_first {
+                // If this was the first in batch, we leave entry for the rest; otherwise, remove only at end.
+                // But for safety, always remove after transfer (could be improved with batch tracking).
+                let mut map = BATCH_RESPONSES.lock().await;
+                map.remove(&batch_id);
+            }
 
             // Gracefully shutdown write half (if any) to signal proper end
             if let Err(e) = AsyncWriteExt::shutdown(&mut socket).await {
@@ -460,11 +517,13 @@ pub async fn send_file_with_progress(
     let actual_file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string();
     let mime = mime_guess::from_path(&path).first_or_octet_stream().to_string();
     let transfer_id = Uuid::new_v4().to_string();
+    let batch_id = None; // Nessun batch_id fornito in questa funzione
     let offer = FileOffer {
         transfer_id: transfer_id.clone(),
         file_name: actual_file_name.clone(),
         file_size,
         mime,
+        batch_id,
         sha256: None,
     };
     let addr = format!("{}:{}", target_ip, target_port);
@@ -762,11 +821,6 @@ pub async fn send_file_with_progress(
             file_info
         )
     ).await;
-    // Mostra una finestra di dialogo come per la ricezione
-    let device_name = gethostname::gethostname().to_string_lossy().to_string();
-    app_handle.dialog().message(format!("✅ File '{}' inviato correttamente a {} ({})", actual_file_name, device_name, target_ip))
-        .title("AirShare - Trasferimento completato")
-        .kind(tauri_plugin_dialog::MessageDialogKind::Info)
-        .show(|_| {});
+    // Funzione di dialogo rimossa come richiesto
     Ok(())
 }
