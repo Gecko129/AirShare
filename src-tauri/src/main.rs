@@ -181,7 +181,7 @@ fn get_devices(devices: tauri::State<'_, SharedDevices>) -> Vec<Device> {
 #[tauri::command]
 async fn send_file(app_handle: tauri::AppHandle, ip: String, port: u16, file_path: String) -> Result<String, String> {
     let path = std::path::PathBuf::from(file_path);
-    match file_transfer::send_file(ip, port, path, app_handle).await {
+    match file_transfer::send_file(ip, port, path, app_handle, None).await {
         Ok(_) => Ok("File inviato con successo".into()),
         Err(e) => Err(e.to_string()),
     }
@@ -212,7 +212,7 @@ async fn send_file_with_progress(
         }
     }
     
-    match file_transfer::send_file_with_progress(ip, port, path_buf, app_handle, file_index, total_files, file_name, Some(OVERALL_SENT.clone()), total_size).await {
+    match file_transfer::send_file_with_progress(ip, port, path_buf, app_handle, file_index, total_files, file_name, Some(OVERALL_SENT.clone()), total_size, None).await {
         Ok(_) => Ok("File inviato con successo".into()),
         Err(e) => Err(e.to_string()),
     }
