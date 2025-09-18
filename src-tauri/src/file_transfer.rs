@@ -569,6 +569,15 @@ pub async fn send_file_with_progress(
         "[SEND] Created FileOffer | transfer_id={} batch_id={:?} file_name={}",
         transfer_id, offer.batch_id, actual_file_name
     );
+    
+    // Log esplicito del batch_id per debug
+    if let Some(ref batch_id) = offer.batch_id {
+        info!("[SEND] 🔗 Batch ID globale per questo trasferimento: {}", batch_id);
+        tauri_log(&app_handle, "info", format!("[SEND] 🔗 Batch ID globale per questo trasferimento: {}", batch_id)).await;
+    } else {
+        warn!("[SEND] ⚠️ Nessun batch_id fornito per il trasferimento {}", transfer_id);
+        tauri_log(&app_handle, "warn", format!("[SEND] ⚠️ Nessun batch_id fornito per il trasferimento {}", transfer_id)).await;
+    }
     let addr = format!("{}:{}", target_ip, target_port);
     info!("Connecting to target address: {}", addr);
     tauri_log(&app_handle, "info", format!("Connecting to {}", addr)).await;
@@ -795,25 +804,33 @@ pub async fn send_file_with_progress(
                     }
                 };
                 
+                let batch_info = if let Some(ref batch_id) = batch_id {
+                    format!(" batch_id={}", batch_id)
+                } else {
+                    " batch_id=none".to_string()
+                };
+                
                 info!(
-                    "send progress | id={} ip={} port={} overall_sent={} overall_total={} overall_percent={:.1} overall_eta={}",
+                    "send progress | id={} ip={} port={} overall_sent={} overall_total={} overall_percent={:.1} overall_eta={}{}",
                     transfer_id,
                     addr.split(':').next().unwrap_or(""),
                     addr.split(':').nth(1).unwrap_or(""),
                     *global,
                     overall_total,
                     overall_percent,
-                    overall_eta_formatted
+                    overall_eta_formatted,
+                    batch_info
                 );
                 tauri_log(&app_handle, "info", format!(
-                    "send progress | id={} ip={} port={} overall_sent={} overall_total={} overall_percent={:.1} overall_eta={}",
+                    "send progress | id={} ip={} port={} overall_sent={} overall_total={} overall_percent={:.1} overall_eta={}{}",
                     transfer_id,
                     addr.split(':').next().unwrap_or(""),
                     addr.split(':').nth(1).unwrap_or(""),
                     *global,
                     overall_total,
                     overall_percent,
-                    overall_eta_formatted
+                    overall_eta_formatted,
+                    batch_info
                 )).await;
                 last_log = Instant::now();
             }
@@ -852,16 +869,23 @@ pub async fn send_file_with_progress(
         format!(" file={}", display_name)
     };
     
+    let batch_info = if let Some(ref batch_id) = batch_id {
+        format!(" batch_id={}", batch_id)
+    } else {
+        " batch_id=none".to_string()
+    };
+    
     tauri_log(
         &app_handle,
         "info",
         format!(
-            "send complete | id={} ip={} port={} path={}{}",
+            "send complete | id={} ip={} port={} path={}{}{}",
             transfer_id,
             addr.split(':').next().unwrap_or(""),
             addr.split(':').nth(1).unwrap_or(""),
             path.display(),
-            file_info
+            file_info,
+            batch_info
         )
     ).await;
     // Funzione di dialogo rimossa come richiesto

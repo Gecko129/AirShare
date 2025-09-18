@@ -200,9 +200,18 @@ async fn send_file_with_progress(
     file_index: Option<usize>,
     total_files: Option<usize>,
     file_name: Option<String>,
-    total_size: Option<u64>
+    total_size: Option<u64>,
+    batch_id: Option<String>
 ) -> Result<String, String> {
-    let path_buf = std::path::PathBuf::from(path);
+    let path_buf = std::path::PathBuf::from(&path);
+    
+    // Log del batch_id ricevuto dal frontend
+    if let Some(ref batch_id) = batch_id {
+        log::info!("[MAIN] Ricevuto batch_id dal frontend: {}", batch_id);
+        log::info!("[MAIN] Invio file {} con batch_id: {}", path, batch_id);
+    } else {
+        log::warn!("[MAIN] Nessun batch_id ricevuto dal frontend per il file: {}", path);
+    }
     
     // If this is the first file, reset the overall progress
     if let Some(index) = file_index {
@@ -212,7 +221,7 @@ async fn send_file_with_progress(
         }
     }
     
-    match file_transfer::send_file_with_progress(ip, port, path_buf, app_handle, file_index, total_files, file_name, Some(OVERALL_SENT.clone()), total_size, None).await {
+    match file_transfer::send_file_with_progress(ip, port, path_buf, app_handle, file_index, total_files, file_name, Some(OVERALL_SENT.clone()), total_size, batch_id).await {
         Ok(_) => Ok("File inviato con successo".into()),
         Err(e) => Err(e.to_string()),
     }

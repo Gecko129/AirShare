@@ -99,8 +99,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
          // Truncated lines (with …) are ignored.
          if (msg.includes("…")) return;
 
-         // New format: send progress | id=XYZ ip=1.2.3.4 port=40123 overall_sent=123 overall_total=456 overall_percent=78.9 overall_eta=23s rimanenti
-         const overallProgressRegex = /^(?<direction>send|recv) progress \| id=(?<id>[^ ]+) ip=(?<ip>[^ ]+) port=(?<port>[^ ]+) overall_sent=(?<overall_sent>\d+) overall_total=(?<overall_total>\d+) overall_percent=(?<overall_percent>[\d.]+) overall_eta=(?<overall_eta>.+)$/;
+         // New format: send progress | id=XYZ ip=1.2.3.4 port=40123 overall_sent=123 overall_total=456 overall_percent=78.9 overall_eta=23s rimanenti batch_id=ABC123
+         const overallProgressRegex = /^(?<direction>send|recv) progress \| id=(?<id>[^ ]+) ip=(?<ip>[^ ]+) port=(?<port>[^ ]+) overall_sent=(?<overall_sent>\d+) overall_total=(?<overall_total>\d+) overall_percent=(?<overall_percent>[\d.]+) overall_eta=(?<overall_eta>.+?)(?: batch_id=(?<batch_id>[^ ]+))?$/;
          const overallMatch = msg.match(overallProgressRegex);
          
          // Debug: log delle regex matches per il nuovo formato
@@ -122,8 +122,16 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           const overall_total = overallMatch[6];
           const overall_percent = overallMatch[7];
           const overall_eta = overallMatch[8];
+          const batch_id = overallMatch[9]; // Può essere undefined se non presente
           
-          console.log('🔍 [DEBUG] Parsed values:', { direction, ip, port, overall_percent, overall_eta });
+          console.log('🔍 [DEBUG] Parsed values:', { direction, ip, port, overall_percent, overall_eta, batch_id });
+          
+          // Log del batch_id se presente
+          if (batch_id) {
+            console.log(`🔗 [DEBUG] Batch ID ricevuto dal backend: ${batch_id}`);
+          } else {
+            console.log('⚠️ [DEBUG] Nessun batch_id ricevuto dal backend nel log di progresso');
+          }
           
           if (direction === 'send' && ip && port && overall_percent) {
             const deviceKey = `${ip}:${port}`;
@@ -341,6 +349,14 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
 
     // Genera un batchId univoco per questo invio
     const batchId = generateBatchId();
+    
+    // Validazione del batchId
+    if (!batchId || batchId.trim() === '') {
+      console.error('❌ [FileTransfer] Errore: batchId generato è vuoto o null');
+      toast.error('Errore nella generazione del batch ID');
+      return;
+    }
+    
     // Log che distingue chiaramente il batchId come identificatore globale del trasferimento
     console.log("📦 [FileTransfer] Global batchId for whole transfer:", batchId);
     console.log("🚀 [FileTransfer] Inizio invio:", { 
@@ -408,6 +424,10 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           console.log(
             `➡️ [FileTransfer] Sending batchId to backend with file:`, { batchId, deviceKey, fileName: f.name }
           );
+          // Log aggiuntivo per debug del batch_id
+          console.log(
+            `🔗 [FileTransfer] Batch ID globale per questo trasferimento: ${batchId} (file ${i + 1}/${selectedFiles.length})`
+          );
 
           await invoke('send_file_with_progress', {
             ip: targetIp,
@@ -422,7 +442,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         }
         toast.success(t("transfer_success", { device: deviceKey }));
       } catch (err) {
-        console.error('❌ [FileTransfer] Errore durante invio verso', deviceKey, err);
+        console.error('❌ [FileTransfer] Errore durante invio verso', deviceKey, 'con batchId:', batchId, err);
         console.error('❌ [FileTransfer] Stack trace:', err);
         toast.error(t("transfer_error", { device: deviceKey }));
 
@@ -431,9 +451,14 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           console.error('❌ [FileTransfer] Error details:', {
             message: err.message,
             name: err.name,
-            stack: err.stack
+            stack: err.stack,
+            batchId: batchId,
+            deviceKey: deviceKey
           });
         }
+        
+        // Log dell'errore con batch_id per tracciabilità
+        console.error(`🔗 [FileTransfer] Errore nel batch ${batchId} per dispositivo ${deviceKey}`);
       } finally {
         setUploadETA(prev => {
           const n = { ...prev };
