@@ -171,17 +171,32 @@ jobs:
         if: contains(matrix.os, 'self-hosted')
         shell: bash
         run: |
-          echo "🚀 Installing Node.js via nvm for Raspberry Pi..."
-          # Installa nvm
-          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
+          echo "🚀 Checking Node.js version for ARM64 self-hosted..."
+          # Load nvm if present, otherwise install it
           export NVM_DIR="$HOME/.nvm"
+          if [ ! -d "$NVM_DIR" ]; then
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
+          fi
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-          # Installa Node.js 18 LTS
-          nvm install 18
+          NODE_OK=false
+          if command -v node >/dev/null 2>&1; then
+            NODE_VERSION=$(node --version)
+            if [[ "$NODE_VERSION" =~ ^v(1[8-9]|[2-9][0-9]) ]]; then
+              NODE_OK=true
+              echo "✅ Node.js already present: $NODE_VERSION"
+            else
+              echo "⚠️  Node.js version $NODE_VERSION is outdated, updating..."
+            fi
+          else
+            echo "❌ Node.js not found, installing..."
+          fi
+
+          if [ "$NODE_OK" != "true" ]; then
+            nvm install 18
+          fi
           nvm use 18
 
-          # Verifica installazione
           echo "Node.js version: $(node -v)"
           echo "Node architecture: $(node -p 'process.arch')"
           echo "NPM version: $(npm -v)"
@@ -320,12 +335,8 @@ jobs:
         if: contains(matrix.os, 'self-hosted')
         shell: bash
         run: |
-          echo "🧹 Cleaning previous Node modules and cache..."
-          rm -rf node_modules package-lock.json
-          npm cache clean --force
-          
-          echo "📦 Installing Node.js dependencies for ARM64 (build from source)..."
-          npm install --build-from-source --prefer-offline --no-audit --no-fund
+          echo "📦 Installing/updating Node.js dependencies for ARM64 (no cache clean)..."
+          npm install --prefer-offline --no-audit --no-fund
 
       - name: Build frontend (self-hosted ARM64)
         if: contains(matrix.os, 'self-hosted')
