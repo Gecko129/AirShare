@@ -118,6 +118,7 @@ jobs:
       - name: Check environment (self-hosted)
         if: contains(matrix.os, 'self-hosted')
         id: check_env
+        shell: bash
         run: |
           echo "🔍 Quick environment check..."
           
@@ -168,6 +169,7 @@ jobs:
 
       - name: Setup Node.js (self-hosted)
         if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.node_ok != 'true'
+        shell: bash
         run: |
           echo "🚀 Installing Node.js 18 (optimized)..."
           # Usa NodeSource per installazione veloce
@@ -177,6 +179,7 @@ jobs:
 
       - name: Setup Rust (self-hosted)
         if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.rust_ok != 'true'
+        shell: bash
         run: |
           echo "🦀 Setting up Rust..."
           if ! command -v rustup >/dev/null 2>&1; then
@@ -188,6 +191,7 @@ jobs:
 
       - name: Setup Tauri CLI (self-hosted)
         if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.tauri_ok != 'true'
+        shell: bash
         run: |
           echo "⚡ Installing Tauri CLI..."
           source ~/.cargo/env 2>/dev/null || true
@@ -199,6 +203,7 @@ jobs:
       # ========================================
       - name: Install system dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
+        shell: bash
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
@@ -216,6 +221,7 @@ jobs:
 
       - name: Install system dependencies (self-hosted)
         if: contains(matrix.os, 'self-hosted')
+        shell: bash
         run: |
           # Check rapido delle dipendenze
           MISSING_DEPS=()
@@ -243,6 +249,7 @@ jobs:
 
       - name: Install Windows dependencies
         if: matrix.os == 'windows-latest'
+        shell: bash
         run: |
           # NSIS per installer Windows
           choco install nsis -y --no-progress
@@ -252,6 +259,7 @@ jobs:
       # CONFIGURAZIONI OTTIMIZZATE
       # ========================================
       - name: Configure build environment
+        shell: bash
         run: |
           # Configurazioni globali per performance
           if [[ "${{ runner.os }}" == "Linux" ]]; then
@@ -269,6 +277,7 @@ jobs:
           fi
 
       - name: Configure Cargo (advanced)
+        shell: bash
         run: |
           mkdir -p ~/.cargo
           cat > ~/.cargo/config.toml << 'EOF'
@@ -299,6 +308,7 @@ jobs:
       # BUILD FRONTEND (OTTIMIZZATO)
       # ========================================
       - name: Install frontend dependencies
+        shell: bash
         run: |
           # Usa npm ci per build riproducibili e veloci
           if [[ -f "package-lock.json" ]]; then
@@ -308,6 +318,7 @@ jobs:
           fi
 
       - name: Build frontend
+        shell: bash
         run: |
           echo "🎨 Building frontend..."
           # Ottimizzazioni per build frontend
@@ -321,6 +332,7 @@ jobs:
       # BUILD TAURI (SUPER OTTIMIZZATO)
       # ========================================
       - name: Build Tauri application
+        shell: bash
         run: |
           echo "🚀 Building Tauri app for ${{ matrix.name }}..."
           
@@ -398,6 +410,7 @@ jobs:
       # ========================================
       - name: Cleanup build artifacts
         if: always()
+        shell: bash
         run: |
           # Pulisci file temporanei per liberare spazio
           if [[ "${{ runner.os }}" != "Windows" ]]; then
