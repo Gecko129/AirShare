@@ -21,25 +21,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS - Build universale più efficiente
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            name: "macOS ARM64"
-            rust-cache-key: "macos-arm64"
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            name: "macOS x64"
-            rust-cache-key: "macos-x64"
-          # Windows - Ottimizzato per MSVC
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            name: "Windows x64"
-            rust-cache-key: "windows-x64"
-          # Linux GitHub hosted - Ottimizzato per performance
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            name: "Linux x64"
-            rust-cache-key: "linux-x64"
           # Linux ARM64 self-hosted - Mantenuto ottimizzato
           - os: [self-hosted, ARM64, Linux]
             target: aarch64-unknown-linux-gnu
@@ -320,6 +301,9 @@ jobs:
         if: contains(matrix.os, 'self-hosted')
         shell: bash
         run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          nvm use 18
           echo "🧹 Cleaning previous Node modules and cache..."
           rm -rf node_modules package-lock.json
           npm cache clean --force
@@ -331,6 +315,9 @@ jobs:
         if: contains(matrix.os, 'self-hosted')
         shell: bash
         run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          nvm use 18
           echo "🎨 Building frontend for ARM64..."
           export NODE_OPTIONS="--max-old-space-size=4096"
           if [[ "$(nproc)" -gt 2 ]]; then
@@ -342,6 +329,9 @@ jobs:
         if: contains(matrix.os, 'self-hosted') == false
         shell: bash
         run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          nvm use 18
           # Usa npm ci per build riproducibili e veloci
           if [[ -f "package-lock.json" ]]; then
             npm ci --prefer-offline --no-audit --no-fund
@@ -353,6 +343,9 @@ jobs:
         if: contains(matrix.os, 'self-hosted') == false
         shell: bash
         run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          nvm use 18
           echo "🎨 Building frontend..."
           # Ottimizzazioni per build frontend
           export NODE_OPTIONS="--max-old-space-size=4096"
