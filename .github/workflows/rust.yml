@@ -360,6 +360,9 @@ jobs:
       - name: Build Tauri application
         shell: bash
         run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          nvm use 18
           echo "🚀 Building Tauri app for ${{ matrix.name }}..."
           
           # Ottimizzazioni specifiche per piattaforma
