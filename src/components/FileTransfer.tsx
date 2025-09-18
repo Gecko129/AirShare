@@ -437,7 +437,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             totalFiles: selectedFiles.length,
             fileName: f.name,
             totalSize: totalSize,
-            batch_id: batchId // assicurati che sia batch_id e non batchId
+            batchId: batchId // Usa batchId (camelCase) per compatibilità con Tauri
           };
           
           // Log dettagliato dei parametri inviati

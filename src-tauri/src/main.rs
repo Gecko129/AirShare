@@ -201,6 +201,7 @@ async fn send_file_with_progress(
     total_files: Option<usize>,
     file_name: Option<String>,
     total_size: Option<u64>,
+    #[serde(rename = "batchId")]
     batch_id: String
 ) -> Result<String, String> {
     let path_buf = std::path::PathBuf::from(&path);
