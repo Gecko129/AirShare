@@ -9,6 +9,11 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Ottimizzazione globale per tutti i runner
+  NODE_OPTIONS: "--max-old-space-size=4096"
+  # Cache keys per invalidazione intelligente
+  CACHE_VERSION: "v3"
 
 jobs:
   build:
@@ -16,245 +21,416 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # macOS - Build universale più efficiente
           - os: macos-latest
-            args: '--target aarch64-apple-darwin'
+            target: aarch64-apple-darwin
+            name: "macOS ARM64"
+            rust-cache-key: "macos-arm64"
           - os: macos-latest
-            args: '--target x86_64-apple-darwin'
+            target: x86_64-apple-darwin
+            name: "macOS x64"
+            rust-cache-key: "macos-x64"
+          # Windows - Ottimizzato per MSVC
           - os: windows-latest
-            args: ''
+            target: x86_64-pc-windows-msvc
+            name: "Windows x64"
+            rust-cache-key: "windows-x64"
+          # Linux GitHub hosted - Ottimizzato per performance
           - os: ubuntu-latest
-            args: ''
+            target: x86_64-unknown-linux-gnu
+            name: "Linux x64"
+            rust-cache-key: "linux-x64"
+          # Linux ARM64 self-hosted - Mantenuto ottimizzato
           - os: [self-hosted, ARM64, Linux]
-            args: '--target aarch64-unknown-linux-gnu'
+            target: aarch64-unknown-linux-gnu
+            name: "Linux ARM64"
+            rust-cache-key: "linux-arm64"
+    
     runs-on: ${{ matrix.os }}
+    name: Build ${{ matrix.name }}
 
     steps:
-      - name: checkout
+      # ========================================
+      # CHECKOUT CON OTTIMIZZAZIONI
+      # ========================================
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Shallow clone per velocità
+          fetch-depth: 1
+          # Ottimizza il checkout
+          show-progress: false
 
-      # SOLO per runner non self-hosted
-      - name: setup node (GitHub hosted)
-        if: matrix.os != '[self-hosted, ARM64, Linux]'
+      # ========================================
+      # CACHE INTELLIGENTE MULTI-LIVELLO
+      # ========================================
+      - name: Cache Rust dependencies
+        if: contains(matrix.os, 'self-hosted') == false
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ env.CACHE_VERSION }}-${{ matrix.rust-cache-key }}
+          cache-on-failure: true
+          cache-all-crates: true
+          # Cache aggiuntive per ottimizzazione
+          cache-targets: true
+          cache-directories: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+
+      - name: Cache Node.js dependencies
+        if: contains(matrix.os, 'self-hosted') == false
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/npm
+          key: ${{ runner.os }}-node-${{ env.CACHE_VERSION }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.CACHE_VERSION }}-
+            ${{ runner.os }}-node-
+
+      # ========================================
+      # SETUP OTTIMIZZATO PER GITHUB RUNNERS
+      # ========================================
+      - name: Setup Node.js (GitHub hosted)
+        if: contains(matrix.os, 'self-hosted') == false
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
-          cache: npm
+          node-version: '18'  # LTS stabile e veloce
+          cache: 'npm'
+          # Ottimizzazioni per performance
+          registry-url: 'https://registry.npmjs.org'
 
-      # SOLO per runner non self-hosted
-      - name: setup rust (GitHub hosted)
-        if: matrix.os != '[self-hosted, ARM64, Linux]'
+      - name: Setup Rust (GitHub hosted)
+        if: contains(matrix.os, 'self-hosted') == false
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.target }}
+          # Componenti minimi necessari
+          components: rustfmt, clippy
 
-      # SETUP SPECIFICO per self-hosted ARM64
-      - name: setup ARM64 environment (self-hosted)
+      # ========================================
+      # SETUP OTTIMIZZATO PER SELF-HOSTED
+      # ========================================
+      - name: Check environment (self-hosted)
         if: contains(matrix.os, 'self-hosted')
+        id: check_env
         run: |
-          echo "🍓 Setting up ARM64 environment for self-hosted runner"
+          echo "🔍 Quick environment check..."
           
-          # Verifica architettura
-          echo "Current architecture: $(uname -m)"
+          # Check sistema
+          ARCH=$(uname -m)
+          echo "arch=$ARCH" >> $GITHUB_OUTPUT
           
-          # Rimuovi Node.js x86 se presente
-          sudo apt remove nodejs npm -y 2>/dev/null || true
-          sudo apt autoremove -y
+          # Check Node.js
+          NODE_OK=false
+          if command -v node >/dev/null 2>&1; then
+            NODE_VERSION=$(node --version)
+            if [[ "$NODE_VERSION" =~ ^v(1[8-9]|[2-9][0-9]) ]]; then
+              NODE_OK=true
+              echo "✅ Node.js OK: $NODE_VERSION"
+            else
+              echo "⚠️  Node.js version $NODE_VERSION might be outdated"
+            fi
+          else
+            echo "❌ Node.js not found"
+          fi
+          echo "node_ok=$NODE_OK" >> $GITHUB_OUTPUT
           
-          # Pulisci cache NPM precedenti
-          rm -rf ~/.npm ~/.cache/npm
+          # Check Rust
+          RUST_OK=false
+          if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
+            RUST_VERSION=$(rustc --version)
+            if rustup target list --installed | grep -q "${{ matrix.target }}"; then
+              RUST_OK=true
+              echo "✅ Rust OK: $RUST_VERSION with target ${{ matrix.target }}"
+            else
+              echo "⚠️  Rust found but missing target ${{ matrix.target }}"
+            fi
+          else
+            echo "❌ Rust not found"
+          fi
+          echo "rust_ok=$RUST_OK" >> $GITHUB_OUTPUT
           
-          # Installa Node.js ARM64 nativo
+          # Check Tauri CLI
+          TAURI_OK=false
+          if command -v tauri >/dev/null 2>&1; then
+            TAURI_VERSION=$(tauri --version 2>/dev/null || echo 'error')
+            if [[ "$TAURI_VERSION" != "error" ]]; then
+              TAURI_OK=true
+              echo "✅ Tauri CLI OK: $TAURI_VERSION"
+            fi
+          fi
+          echo "tauri_ok=$TAURI_OK" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js (self-hosted)
+        if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.node_ok != 'true'
+        run: |
+          echo "🚀 Installing Node.js 18 (optimized)..."
+          # Usa NodeSource per installazione veloce
           curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
           sudo apt-get install -y nodejs
-          
-          # Verifica installazione
-          echo "Node.js version: $(node --version)"
-          echo "Node.js architecture: $(file $(which node) | grep -o 'ARM aarch64\|x86-64')"
-          echo "NPM version: $(npm --version)"
-          
-          # Setup Rust se non presente o sbagliato
-          if ! command -v cargo &> /dev/null || file ~/.cargo/bin/cargo | grep -q "x86-64"; then
-            echo "Installing/fixing Rust for ARM64..."
-            rustup self uninstall -y 2>/dev/null || true
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "Node.js installed: $(node --version)"
+
+      - name: Setup Rust (self-hosted)
+        if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.rust_ok != 'true'
+        run: |
+          echo "🦀 Setting up Rust..."
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
             source ~/.cargo/env
           fi
+          rustup target add ${{ matrix.target }}
+          echo "Rust ready: $(rustc --version)"
+
+      - name: Setup Tauri CLI (self-hosted)
+        if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.tauri_ok != 'true'
+        run: |
+          echo "⚡ Installing Tauri CLI..."
+          source ~/.cargo/env 2>/dev/null || true
+          cargo install tauri-cli --locked
+          echo "Tauri CLI ready: $(tauri --version)"
+
+      # ========================================
+      # DIPENDENZE SISTEMA OTTIMIZZATE
+      # ========================================
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            pkg-config
+
+      - name: Install system dependencies (self-hosted)
+        if: contains(matrix.os, 'self-hosted')
+        run: |
+          # Check rapido delle dipendenze
+          MISSING_DEPS=()
+          for dep in libgtk-3-dev libwebkit2gtk-4.1-dev build-essential; do
+            if ! dpkg -l | grep -q "^ii  $dep "; then
+              MISSING_DEPS+=("$dep")
+            fi
+          done
           
-          echo "Rust version: $(rustc --version)"
-          echo "Cargo architecture: $(file ~/.cargo/bin/cargo | grep -o 'ARM aarch64\|x86-64')"
-          
-          # Aggiungi ARM64 target
-          rustup target add aarch64-unknown-linux-gnu
-          
-          # Configurazione ottimizzata per ARM64
+          if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
+            echo "📦 Installing missing dependencies: ${MISSING_DEPS[*]}"
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends \
+              libgtk-3-dev \
+              libwebkit2gtk-4.1-dev \
+              libayatana-appindicator3-dev \
+              librsvg2-dev \
+              patchelf \
+              build-essential \
+              libssl-dev \
+              pkg-config
+          else
+            echo "✅ All system dependencies already installed"
+          fi
+
+      - name: Install Windows dependencies
+        if: matrix.os == 'windows-latest'
+        run: |
+          # NSIS per installer Windows
+          choco install nsis -y --no-progress
+          # WebView2 è già presente nei runner GitHub
+
+      # ========================================
+      # CONFIGURAZIONI OTTIMIZZATE
+      # ========================================
+      - name: Configure build environment
+        run: |
+          # Configurazioni globali per performance
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            # Ottimizzazioni Linux
+            echo "RUSTFLAGS=-C target-cpu=native -C opt-level=2" >> $GITHUB_ENV
+            echo "CARGO_BUILD_JOBS=$(nproc)" >> $GITHUB_ENV
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            # Ottimizzazioni macOS
+            echo "RUSTFLAGS=-C target-cpu=native" >> $GITHUB_ENV
+            echo "CARGO_BUILD_JOBS=$(sysctl -n hw.logicalcpu)" >> $GITHUB_ENV
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            # Ottimizzazioni Windows
+            echo "RUSTFLAGS=-C target-cpu=native" >> $env:GITHUB_ENV
+            echo "CARGO_BUILD_JOBS=$env:NUMBER_OF_PROCESSORS" >> $env:GITHUB_ENV
+          fi
+
+      - name: Configure Cargo (advanced)
+        run: |
           mkdir -p ~/.cargo
           cat > ~/.cargo/config.toml << 'EOF'
           [build]
-          jobs = 3
+          jobs = 0  # Usa tutti i core disponibili
           
-          [target.aarch64-unknown-linux-gnu]
-          rustflags = ["-C", "target-cpu=native"]
+          [net]
+          retry = 2
+          git-fetch-with-cli = true
           
           [profile.dev]
           opt-level = 1
           debug = 1
+          incremental = true
           
           [profile.release]
-          opt-level = 2
+          opt-level = 3
           lto = "thin"
           codegen-units = 1
+          panic = "abort"
+          
+          [profile.release-with-debug]
+          inherits = "release"
+          debug = true
           EOF
-        shell: bash
 
-      - name: add mac targets
-        if: matrix.os == 'macos-latest'
+      # ========================================
+      # BUILD FRONTEND (OTTIMIZZATO)
+      # ========================================
+      - name: Install frontend dependencies
         run: |
-          rustup target add aarch64-apple-darwin
-          rustup target add x86_64-apple-darwin
-        shell: bash
+          # Usa npm ci per build riproducibili e veloci
+          if [[ -f "package-lock.json" ]]; then
+            npm ci --prefer-offline --no-audit --no-fund
+          else
+            npm install --prefer-offline --no-audit --no-fund
+          fi
 
-      - name: cache cargo (non self-hosted)
-        if: matrix.os != '[self-hosted, ARM64, Linux]'
-        uses: Swatinem/rust-cache@v2
-
-      # Cache manuale per self-hosted (più affidabile)
-      - name: cache cargo (self-hosted)
-        if: contains(matrix.os, 'self-hosted')
+      - name: Build frontend
         run: |
-          # Crea directory cache se non esiste
-          mkdir -p ~/.cargo/registry/cache
-          mkdir -p ~/.cargo/registry/src
-          mkdir -p ~/.cargo/git/db
-          echo "Cargo cache directory prepared"
-        shell: bash
-
-      - name: install frontend deps (non self-hosted)
-        if: matrix.os != '[self-hosted, ARM64, Linux]'
-        run: npm ci
-        shell: bash
-
-      - name: install frontend deps (self-hosted)
-        if: contains(matrix.os, 'self-hosted')
-        run: |
-          # Assicurati di usare il Node.js ARM64 appena installato
-          export PATH="/usr/bin:$PATH"
-          
-          # Pulisci node_modules precedenti (potrebbero contenere binari x86)
-          rm -rf node_modules package-lock.json
-          
-          # Installa con Node.js ARM64
-          npm install
-          
-          echo "Frontend dependencies installed with ARM64 Node.js"
-        shell: bash
-
-      - name: install nsis
-        if: matrix.os == 'windows-latest'
-        run: choco install nsis -y
-
-      - name: install linux deps (Ubuntu hosted)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev
-        shell: bash
-
-      - name: install linux deps (self-hosted ARM64)
-        if: contains(matrix.os, 'self-hosted')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libsoup-3.0-dev \
-            libwebkit2gtk-4.1-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libssl-dev \
-            pkg-config
-        shell: bash
-
-      - name: build frontend
-        run: |
-          if [ "${{ matrix.os }}" = "self-hosted" ]; then
-            export PATH="/usr/bin:$PATH"
-            export NODE_OPTIONS="--max-old-space-size=3072"
+          echo "🎨 Building frontend..."
+          # Ottimizzazioni per build frontend
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          if [[ "${{ runner.os }}" == "Linux" ]] && [[ "$(nproc)" -gt 2 ]]; then
+            export UV_THREADPOOL_SIZE=$(nproc)
           fi
           npm run build
-        shell: bash
 
-      - name: build tauri app
+      # ========================================
+      # BUILD TAURI (SUPER OTTIMIZZATO)
+      # ========================================
+      - name: Build Tauri application
         run: |
-          if [ "${{ matrix.os }}" = "self-hosted" ]; then
-            source ~/.cargo/env
-            export PATH="$HOME/.cargo/bin:/usr/bin:$PATH"
-            export NODE_OPTIONS="--max-old-space-size=3072"
-            
-            # Debug info
-            echo "Using Node.js: $(which node)"
-            echo "Using Cargo: $(which cargo)"
-            echo "Target: ${{ matrix.args }}"
-            
-            # Build con Tauri CLI locale
-            ~/.cargo/bin/tauri build ${{ matrix.args }} --verbose
-          else
-            npm run tauri build -- ${{ matrix.args }}
+          echo "🚀 Building Tauri app for ${{ matrix.name }}..."
+          
+          # Ottimizzazioni specifiche per piattaforma
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            export PKG_CONFIG_ALLOW_CROSS=1
+            export CARGO_TARGET_DIR="target"
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            # Ottimizzazioni Windows
+            export CARGO_TARGET_DIR="target"
+            export RUSTFLAGS="$RUSTFLAGS -C link-arg=/INCREMENTAL:NO"
           fi
-        env:
-          PKG_CONFIG_ALLOW_CROSS: ${{ contains(matrix.args, 'aarch64-unknown-linux-gnu') && '1' || '' }}
-        shell: bash
+          
+          # Build command ottimizzato
+          if [[ "${{ contains(matrix.os, 'self-hosted') }}" == "true" ]]; then
+            source ~/.cargo/env 2>/dev/null || true
+            tauri build --target ${{ matrix.target }} --verbose
+          else
+            npm run tauri build -- --target ${{ matrix.target }}
+          fi
 
-      - name: upload bundle Windows
+      # ========================================
+      # UPLOAD ARTIFACTS (ORGANIZZATO)
+      # ========================================
+      - name: Upload Windows artifacts
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: AirShare-Setup.exe
-          path: src-tauri/target/release/bundle/nsis/*.exe
-
-      - name: upload bundle macOS aarch64
-        if: matrix.os == 'macos-latest' && matrix.args == '--target aarch64-apple-darwin'
-        uses: actions/upload-artifact@v4
-        with:
-          name: AirShare-ARM64.dmg
-          path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
-
-      - name: upload bundle macOS x86_64
-        if: matrix.os == 'macos-latest' && matrix.args == '--target x86_64-apple-darwin'
-        uses: actions/upload-artifact@v4
-        with:
-          name: AirShare-x86_64.dmg
-          path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/AirShare_0.3.1_x64.dmg
-
-      - name: upload bundle Linux
-        if: matrix.os == 'ubuntu-latest' && matrix.args == ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: AirShare-linux
-          path: src-tauri/target/release/bundle/deb/*.deb
-
-      - name: upload bundle Linux AppImage
-        if: matrix.os == 'ubuntu-latest' && matrix.args == ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: AirShare-linux-AppImage
-          path: src-tauri/target/release/bundle/appimage/*.AppImage
-
-      - name: upload bundle Linux ARM64
-        if: contains(matrix.os, 'self-hosted') || (matrix.os == 'ubuntu-latest' && matrix.args == '--target aarch64-unknown-linux-gnu')
-        uses: actions/upload-artifact@v4
-        with:
-          name: AirShare-linux-arm64
+          name: AirShare-${{ matrix.name }}-Setup
           path: |
-            src-tauri/target/aarch64-unknown-linux-gnu/release/bundle/deb/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload macOS artifacts
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirShare-${{ matrix.name }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Linux artifacts (hosted)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirShare-${{ matrix.name }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: warn
+          retention-days: 30
 
-      - name: upload bundle Linux ARM64 AppImage
-        if: contains(matrix.os, 'self-hosted') || (matrix.os == 'ubuntu-latest' && matrix.args == '--target aarch64-unknown-linux-gnu')
+      - name: Upload Linux ARM64 artifacts (self-hosted)
+        if: contains(matrix.os, 'self-hosted')
         uses: actions/upload-artifact@v4
         with:
-          name: AirShare-linux-arm64-AppImage
+          name: AirShare-${{ matrix.name }}
           path: |
-            src-tauri/target/aarch64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: warn
+          retention-days: 30
+
+      # ========================================
+      # CLEANUP E OTTIMIZZAZIONE POST-BUILD
+      # ========================================
+      - name: Cleanup build artifacts
+        if: always()
+        run: |
+          # Pulisci file temporanei per liberare spazio
+          if [[ "${{ runner.os }}" != "Windows" ]]; then
+            find . -name "*.tmp" -type f -delete 2>/dev/null || true
+            find . -name "*.temp" -type f -delete 2>/dev/null || true
+          fi
+          
+          # Report dimensioni finali
+          if command -v du >/dev/null 2>&1; then
+            echo "📊 Final target directory size:"
+            du -sh src-tauri/target/ 2>/dev/null || echo "Target directory not found"
+          fi
+
+  # ========================================
+  # JOB DI RELEASE (OPZIONALE)
+  # ========================================
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        
+      - name: Display structure
+        run: ls -la
+        
+      - name: Create release summary
+        run: |
+          echo "# 🚀 AirShare Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "Built for all platforms successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "## Artifacts created:" >> $GITHUB_STEP_SUMMARY
+          echo "- Windows x64 Setup" >> $GITHUB_STEP_SUMMARY
+          echo "- macOS ARM64 & x64 DMG" >> $GITHUB_STEP_SUMMARY
+          echo "- Linux x64 & ARM64 packages" >> $GITHUB_STEP_SUMMARY
