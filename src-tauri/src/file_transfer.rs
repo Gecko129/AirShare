@@ -23,7 +23,7 @@ static TRANSFER_RESPONSES: Lazy<TokioMutex<HashMap<String, bool>>> = Lazy::new(|
 static BATCH_RESPONSES: Lazy<TokioMutex<HashMap<String, (bool, Option<PathBuf>)>>> =
     Lazy::new(|| TokioMutex::new(HashMap::new()));
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RespondTransferArgs {
     #[serde(alias = "transfer_id")]
