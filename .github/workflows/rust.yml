@@ -169,37 +169,53 @@ jobs:
 
       - name: Setup Node.js (self-hosted ARM64)
         if: contains(matrix.os, 'self-hosted')
+        id: setup_node_selfhosted
         shell: bash
         run: |
-          echo "🚀 Checking Node.js version for ARM64 self-hosted..."
-          # Load nvm if present, otherwise install it
-          export NVM_DIR="$HOME/.nvm"
-          if [ ! -d "$NVM_DIR" ]; then
-            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
-          fi
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
+          echo "🚀 Using pre-installed Node.js 20.19.5 for ARM64 self-hosted..."
+          # Assume Node.js 20.19.5 is already installed and in $PATH
+          NODE_EXPECTED="v20.19.5"
           NODE_OK=false
           if command -v node >/dev/null 2>&1; then
             NODE_VERSION=$(node --version)
-            if [[ "$NODE_VERSION" =~ ^v(1[8-9]|[2-9][0-9]) ]]; then
+            if [[ "$NODE_VERSION" == "$NODE_EXPECTED" ]]; then
               NODE_OK=true
-              echo "✅ Node.js already present: $NODE_VERSION"
+              echo "✅ Node.js version is $NODE_VERSION (expected)"
             else
-              echo "⚠️  Node.js version $NODE_VERSION is outdated, updating..."
+              echo "⚠️  Node.js version is $NODE_VERSION (expected $NODE_EXPECTED)"
             fi
           else
-            echo "❌ Node.js not found, installing..."
+            echo "❌ Node.js not found in PATH!"
           fi
+          echo "node_ok=$NODE_OK" >> $GITHUB_OUTPUT
+          echo "node_version=$(node --version 2>/dev/null || echo notfound)" >> $GITHUB_OUTPUT
+          echo "Node.js version: $(node -v 2>/dev/null || echo notfound)"
+          echo "Node architecture: $(node -p 'process.arch' 2>/dev/null || echo notfound)"
+          echo "NPM version: $(npm -v 2>/dev/null || echo notfound)"
 
-          if [ "$NODE_OK" != "true" ]; then
-            nvm install 20
+      - name: Reinstall Node.js 20.19.5 if build failed for Illegal instruction (self-hosted ARM64)
+        if: failure() && contains(matrix.os, 'self-hosted')
+        shell: bash
+        continue-on-error: true
+        run: |
+          # Only reinstall Node.js if previous build failed due to Illegal instruction
+          if grep -q "Illegal instruction" "$GITHUB_WORKSPACE/../_temp/_runner_command_failure_message" 2>/dev/null || \
+             grep -r "Illegal instruction" ./src-tauri/target/ 2>/dev/null; then
+            echo "🛠  Build failed with Illegal instruction, reinstalling Node.js 20.19.5..."
+            # Replace this with your preferred reinstall method for Node.js 20.19.5
+            # For example, using nvm or a direct binary install
+            # Here, we show nvm as an example:
+            export NVM_DIR="$HOME/.nvm"
+            if [ ! -d "$NVM_DIR" ]; then
+              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
+            fi
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm install 20.19.5 --default
+            nvm use 20.19.5
+            echo "Node.js version after reinstall: $(node -v)"
+          else
+            echo "No Illegal instruction detected, not reinstalling Node.js."
           fi
-          nvm use 20
-
-          echo "Node.js version: $(node -v)"
-          echo "Node architecture: $(node -p 'process.arch')"
-          echo "NPM version: $(npm -v)"
 
       - name: Setup Rust (self-hosted)
         if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.rust_ok != 'true'
@@ -335,7 +351,8 @@ jobs:
         if: contains(matrix.os, 'self-hosted')
         shell: bash
         run: |
-          echo "📦 Installing/updating Node.js dependencies for ARM64 (no cache clean)..."
+          echo "📦 Installing Node.js dependencies for ARM64 (no cache clean, no reinstall)..."
+          # Do not clean npm cache or node_modules, just install if needed
           npm install --prefer-offline --no-audit --no-fund
 
       - name: Build frontend (self-hosted ARM64)
@@ -347,7 +364,15 @@ jobs:
           if [[ "$(nproc)" -gt 2 ]]; then
             export UV_THREADPOOL_SIZE=$(nproc)
           fi
-          npm run build
+          npm run build || {
+            if grep -q "Illegal instruction" npm-debug.log 2>/dev/null; then
+              echo "❗ Build failed with Illegal instruction. Will trigger Node.js reinstall step."
+              exit 1
+            else
+              echo "❗ Build failed for another reason."
+              exit 1
+            fi
+          }
 
       - name: Install frontend dependencies
         if: contains(matrix.os, 'self-hosted') == false
