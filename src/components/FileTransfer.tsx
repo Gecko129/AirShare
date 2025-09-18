@@ -429,7 +429,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             `🔗 [FileTransfer] Batch ID globale per questo trasferimento: ${batchId} (file ${i + 1}/${selectedFiles.length})`
           );
 
-          await invoke('send_file_with_progress', {
+          const invokeParams = {
             ip: targetIp,
             port: targetPort,
             path: filePath,
@@ -438,7 +438,15 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             fileName: f.name,
             totalSize: totalSize,
             batch_id: batchId // assicurati che sia batch_id e non batchId
-          });
+          };
+          
+          // Log dettagliato dei parametri inviati
+          console.log('🔍 [FileTransfer] Parametri invoke completi:', JSON.stringify(invokeParams, null, 2));
+          console.log('🔍 [FileTransfer] Tipo di batchId:', typeof batchId, 'Valore:', batchId);
+          console.log('🔍 [FileTransfer] batchId è stringa vuota?', batchId === '');
+          console.log('🔍 [FileTransfer] batchId è null/undefined?', batchId == null);
+          
+          await invoke('send_file_with_progress', invokeParams);
         }
         toast.success(t("transfer_success", { device: deviceKey }));
       } catch (err) {

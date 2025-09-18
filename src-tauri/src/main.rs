@@ -201,16 +201,28 @@ async fn send_file_with_progress(
     total_files: Option<usize>,
     file_name: Option<String>,
     total_size: Option<u64>,
-    batch_id: Option<String>
+    batch_id: String
 ) -> Result<String, String> {
     let path_buf = std::path::PathBuf::from(&path);
     
+    // Log dettagliato di tutti i parametri ricevuti
+    log::info!("[MAIN] Parametri ricevuti dal frontend:");
+    log::info!("[MAIN] - ip: {}", ip);
+    log::info!("[MAIN] - port: {}", port);
+    log::info!("[MAIN] - path: {}", path);
+    log::info!("[MAIN] - file_index: {:?}", file_index);
+    log::info!("[MAIN] - total_files: {:?}", total_files);
+    log::info!("[MAIN] - file_name: {:?}", file_name);
+    log::info!("[MAIN] - total_size: {:?}", total_size);
+    log::info!("[MAIN] - batch_id: {:?}", batch_id);
+    
     // Log del batch_id ricevuto dal frontend
-    if let Some(ref batch_id) = batch_id {
-        log::info!("[MAIN] Ricevuto batch_id dal frontend: {}", batch_id);
+    if !batch_id.is_empty() {
+        log::info!("[MAIN] ✅ Ricevuto batch_id dal frontend: {}", batch_id);
         log::info!("[MAIN] Invio file {} con batch_id: {}", path, batch_id);
     } else {
-        log::warn!("[MAIN] Nessun batch_id ricevuto dal frontend per il file: {}", path);
+        log::warn!("[MAIN] ❌ Nessun batch_id ricevuto dal frontend per il file: {}", path);
+        log::warn!("[MAIN] Il parametro batch_id è vuoto");
     }
     
     // If this is the first file, reset the overall progress
@@ -221,7 +233,8 @@ async fn send_file_with_progress(
         }
     }
     
-    match file_transfer::send_file_with_progress(ip, port, path_buf, app_handle, file_index, total_files, file_name, Some(OVERALL_SENT.clone()), total_size, batch_id).await {
+    let batch_id_option = if batch_id.is_empty() { None } else { Some(batch_id) };
+    match file_transfer::send_file_with_progress(ip, port, path_buf, app_handle, file_index, total_files, file_name, Some(OVERALL_SENT.clone()), total_size, batch_id_option).await {
         Ok(_) => Ok("File inviato con successo".into()),
         Err(e) => Err(e.to_string()),
     }
