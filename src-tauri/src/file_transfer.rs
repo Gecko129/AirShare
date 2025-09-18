@@ -226,6 +226,8 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
                 "[RECV] Parsed FileOffer | transfer_id={} batch_id={:?} file_name={}",
                 offer.transfer_id, offer.batch_id, offer.file_name
             );
+            // Emit the full header JSON line to the frontend for debugging
+            tauri_log(&app_handle, "debug", format!("[RECV] Full FileOffer JSON: {}", header_str)).await;
             // Determine batch_id (use transfer_id if not present)
             let batch_id = offer.batch_id.clone().unwrap_or_else(|| offer.transfer_id.clone());
             info!("({addr}) Parsed file offer: {:?}, batch_id: {}", offer, batch_id);

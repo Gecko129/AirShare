@@ -341,7 +341,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
 
     // Genera un batchId univoco per questo invio
     const batchId = generateBatchId();
-
+    console.log("🎯 [FileTransfer] Generated batchId:", batchId);
     console.log("🚀 [FileTransfer] Inizio invio:", { 
       files: selectedFiles.map(f => ({ name: f.name, size: f.size, path: f.path })),
       devices: selectedDevices,
