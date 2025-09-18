@@ -348,9 +348,6 @@ jobs:
         if: contains(matrix.os, 'self-hosted') == false
         shell: bash
         run: |
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm use 18
           # Usa npm ci per build riproducibili e veloci
           if [[ -f "package-lock.json" ]]; then
             npm ci --prefer-offline --no-audit --no-fund
@@ -362,9 +359,6 @@ jobs:
         if: contains(matrix.os, 'self-hosted') == false
         shell: bash
         run: |
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm use 18
           echo "🎨 Building frontend..."
           # Ottimizzazioni per build frontend
           export NODE_OPTIONS="--max-old-space-size=4096"
@@ -379,9 +373,6 @@ jobs:
       - name: Build Tauri application
         shell: bash
         run: |
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm use 18
           echo "🚀 Building Tauri app for ${{ matrix.name }}..."
           
           # Ottimizzazioni specifiche per piattaforma
@@ -396,6 +387,9 @@ jobs:
           
           # Build command ottimizzato
           if [[ "${{ contains(matrix.os, 'self-hosted') }}" == "true" ]]; then
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 18
             source ~/.cargo/env 2>/dev/null || true
             tauri build --target ${{ matrix.target }} --verbose
           else
