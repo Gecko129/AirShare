@@ -167,15 +167,24 @@ jobs:
           fi
           echo "tauri_ok=$TAURI_OK" >> $GITHUB_OUTPUT
 
-      - name: Setup Node.js (self-hosted)
-        if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.node_ok != 'true'
+      - name: Setup Node.js (self-hosted ARM64)
+        if: contains(matrix.os, 'self-hosted')
         shell: bash
         run: |
-          echo "🚀 Installing Node.js 18 (optimized)..."
-          # Usa NodeSource per installazione veloce
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-          echo "Node.js installed: $(node --version)"
+          echo "🚀 Installing Node.js via nvm for Raspberry Pi..."
+          # Installa nvm
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+          # Installa Node.js 18 LTS
+          nvm install 18
+          nvm use 18
+
+          # Verifica installazione
+          echo "Node.js version: $(node -v)"
+          echo "Node architecture: $(node -p 'process.arch')"
+          echo "NPM version: $(npm -v)"
 
       - name: Setup Rust (self-hosted)
         if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.rust_ok != 'true'
@@ -282,7 +291,7 @@ jobs:
           mkdir -p ~/.cargo
           cat > ~/.cargo/config.toml << 'EOF'
           [build]
-          jobs = 0  # Usa tutti i core disponibili
+          # jobs automatici (Cargo usa tutti i core disponibili)
           
           [net]
           retry = 2
