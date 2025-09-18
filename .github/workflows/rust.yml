@@ -316,7 +316,30 @@ jobs:
       # ========================================
       # BUILD FRONTEND (OTTIMIZZATO)
       # ========================================
+      - name: Install frontend dependencies (self-hosted ARM64)
+        if: contains(matrix.os, 'self-hosted')
+        shell: bash
+        run: |
+          echo "🧹 Cleaning previous Node modules and cache..."
+          rm -rf node_modules package-lock.json
+          npm cache clean --force
+          
+          echo "📦 Installing Node.js dependencies for ARM64 (build from source)..."
+          npm install --build-from-source --prefer-offline --no-audit --no-fund
+
+      - name: Build frontend (self-hosted ARM64)
+        if: contains(matrix.os, 'self-hosted')
+        shell: bash
+        run: |
+          echo "🎨 Building frontend for ARM64..."
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          if [[ "$(nproc)" -gt 2 ]]; then
+            export UV_THREADPOOL_SIZE=$(nproc)
+          fi
+          npm run build
+
       - name: Install frontend dependencies
+        if: contains(matrix.os, 'self-hosted') == false
         shell: bash
         run: |
           # Usa npm ci per build riproducibili e veloci
@@ -327,6 +350,7 @@ jobs:
           fi
 
       - name: Build frontend
+        if: contains(matrix.os, 'self-hosted') == false
         shell: bash
         run: |
           echo "🎨 Building frontend..."
