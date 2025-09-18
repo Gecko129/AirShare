@@ -282,7 +282,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     }
     setSelectedFiles(prev => [...prev, ...dropped]);
   };
-
+//ciao
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
