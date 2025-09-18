@@ -167,13 +167,13 @@ jobs:
           fi
           echo "tauri_ok=$TAURI_OK" >> $GITHUB_OUTPUT
 
-      - name: Setup Node.js (self-hosted ARM64)
+      # ===== Self-hosted ARM64 Node.js setup and frontend build (optimized) =====
+      - name: Setup and check Node.js (self-hosted ARM64)
         if: contains(matrix.os, 'self-hosted')
         id: setup_node_selfhosted
         shell: bash
         run: |
           echo "🚀 Using pre-installed Node.js 20.19.5 for ARM64 self-hosted..."
-          # Assume Node.js 20.19.5 is already installed and in $PATH
           NODE_EXPECTED="v20.19.5"
           NODE_OK=false
           if command -v node >/dev/null 2>&1; then
@@ -193,18 +193,32 @@ jobs:
           echo "Node architecture: $(node -p 'process.arch' 2>/dev/null || echo notfound)"
           echo "NPM version: $(npm -v 2>/dev/null || echo notfound)"
 
-      - name: Reinstall Node.js 20.19.5 if build failed for Illegal instruction (self-hosted ARM64)
-        if: failure() && contains(matrix.os, 'self-hosted')
+      - name: Install frontend dependencies (self-hosted ARM64)
+        if: contains(matrix.os, 'self-hosted')
         shell: bash
-        continue-on-error: true
         run: |
-          # Only reinstall Node.js if previous build failed due to Illegal instruction
-          if grep -q "Illegal instruction" "$GITHUB_WORKSPACE/../_temp/_runner_command_failure_message" 2>/dev/null || \
-             grep -r "Illegal instruction" ./src-tauri/target/ 2>/dev/null; then
-            echo "🛠  Build failed with Illegal instruction, reinstalling Node.js 20.19.5..."
-            # Replace this with your preferred reinstall method for Node.js 20.19.5
-            # For example, using nvm or a direct binary install
-            # Here, we show nvm as an example:
+          echo "📦 Installing Node.js dependencies for ARM64 (no cache clean, no reinstall)..."
+          # Do not clean npm cache or node_modules, just install if needed
+          npm install --prefer-offline --no-audit --no-fund
+
+      - name: Build frontend (self-hosted ARM64, retry Node.js if Illegal instruction)
+        if: contains(matrix.os, 'self-hosted')
+        shell: bash
+        run: |
+          echo "🎨 Building frontend for ARM64 (optimized, Node.js 20.19.5)..."
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          if [[ "$(nproc)" -gt 2 ]]; then
+            export UV_THREADPOOL_SIZE=$(nproc)
+          fi
+          set +e
+          npm run build
+          BUILD_EXIT=$?
+          if [[ $BUILD_EXIT -eq 0 ]]; then
+            echo "✅ Frontend build succeeded."
+            exit 0
+          fi
+          if grep -q "Illegal instruction" npm-debug.log 2>/dev/null; then
+            echo "❗ Build failed with Illegal instruction. Reinstalling Node.js 20.19.5 and retrying..."
             export NVM_DIR="$HOME/.nvm"
             if [ ! -d "$NVM_DIR" ]; then
               curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
@@ -213,8 +227,11 @@ jobs:
             nvm install 20.19.5 --default
             nvm use 20.19.5
             echo "Node.js version after reinstall: $(node -v)"
+            npm run build
+            exit $?
           else
-            echo "No Illegal instruction detected, not reinstalling Node.js."
+            echo "❗ Build failed for another reason."
+            exit $BUILD_EXIT
           fi
 
       - name: Setup Rust (self-hosted)
@@ -347,32 +364,6 @@ jobs:
       # ========================================
       # BUILD FRONTEND (OTTIMIZZATO)
       # ========================================
-      - name: Install frontend dependencies (self-hosted ARM64)
-        if: contains(matrix.os, 'self-hosted')
-        shell: bash
-        run: |
-          echo "📦 Installing Node.js dependencies for ARM64 (no cache clean, no reinstall)..."
-          # Do not clean npm cache or node_modules, just install if needed
-          npm install --prefer-offline --no-audit --no-fund
-
-      - name: Build frontend (self-hosted ARM64)
-        if: contains(matrix.os, 'self-hosted')
-        shell: bash
-        run: |
-          echo "🎨 Building frontend for ARM64..."
-          export NODE_OPTIONS="--max-old-space-size=4096"
-          if [[ "$(nproc)" -gt 2 ]]; then
-            export UV_THREADPOOL_SIZE=$(nproc)
-          fi
-          npm run build || {
-            if grep -q "Illegal instruction" npm-debug.log 2>/dev/null; then
-              echo "❗ Build failed with Illegal instruction. Will trigger Node.js reinstall step."
-              exit 1
-            else
-              echo "❗ Build failed for another reason."
-              exit 1
-            fi
-          }
 
       - name: Install frontend dependencies
         if: contains(matrix.os, 'self-hosted') == false
