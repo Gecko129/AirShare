@@ -21,6 +21,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # macOS - Build universale più efficiente
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: "macOS ARM64"
+            rust-cache-key: "macos-arm64"
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: "macOS x64"
+            rust-cache-key: "macos-x64"
+          # Windows - Ottimizzato per MSVC
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: "Windows x64"
+            rust-cache-key: "windows-x64"
+          # Linux GitHub hosted - Ottimizzato per performance
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: "Linux x64"
+            rust-cache-key: "linux-x64"
           # Linux ARM64 self-hosted - Mantenuto ottimizzato
           - os: [self-hosted, ARM64, Linux]
             target: aarch64-unknown-linux-gnu
