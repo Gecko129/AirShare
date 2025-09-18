@@ -417,7 +417,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             totalFiles: selectedFiles.length,
             fileName: f.name,
             totalSize: totalSize,
-            batchId: batchId
+            batch_id: batchId
           });
         }
         toast.success(t("transfer_success", { device: deviceKey }));
