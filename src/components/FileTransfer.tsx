@@ -341,7 +341,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
 
     // Genera un batchId univoco per questo invio
     const batchId = generateBatchId();
-    console.log("🎯 [FileTransfer] Generated batchId:", batchId);
+    // Log che distingue chiaramente il batchId come identificatore globale del trasferimento
+    console.log("📦 [FileTransfer] Global batchId for whole transfer:", batchId);
     console.log("🚀 [FileTransfer] Inizio invio:", { 
       files: selectedFiles.map(f => ({ name: f.name, size: f.size, path: f.path })),
       devices: selectedDevices,
@@ -402,6 +403,10 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
           // Log con batchId, deviceKey, fileIndex, fileName
           console.log(
             `[FileTransfer] Invio file (batchId=${batchId}, deviceKey=${deviceKey}, fileIndex=${i}, fileName=${f.name})`
+          );
+          // Log esplicito che mostra il batchId inviato al backend con il file
+          console.log(
+            `➡️ [FileTransfer] Sending batchId to backend with file:`, { batchId, deviceKey, fileName: f.name }
           );
 
           await invoke('send_file_with_progress', {
