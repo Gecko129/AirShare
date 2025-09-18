@@ -167,72 +167,24 @@ jobs:
           fi
           echo "tauri_ok=$TAURI_OK" >> $GITHUB_OUTPUT
 
-      # ===== Self-hosted ARM64 Node.js setup and frontend build (optimized) =====
-      - name: Setup and check Node.js (self-hosted ARM64)
+      - name: Setup Node.js (self-hosted ARM64)
         if: contains(matrix.os, 'self-hosted')
-        id: setup_node_selfhosted
         shell: bash
         run: |
-          echo "🚀 Using pre-installed Node.js 20.19.5 for ARM64 self-hosted..."
-          NODE_EXPECTED="v20.19.5"
-          NODE_OK=false
-          if command -v node >/dev/null 2>&1; then
-            NODE_VERSION=$(node --version)
-            if [[ "$NODE_VERSION" == "$NODE_EXPECTED" ]]; then
-              NODE_OK=true
-              echo "✅ Node.js version is $NODE_VERSION (expected)"
-            else
-              echo "⚠️  Node.js version is $NODE_VERSION (expected $NODE_EXPECTED)"
-            fi
-          else
-            echo "❌ Node.js not found in PATH!"
-          fi
-          echo "node_ok=$NODE_OK" >> $GITHUB_OUTPUT
-          echo "node_version=$(node --version 2>/dev/null || echo notfound)" >> $GITHUB_OUTPUT
-          echo "Node.js version: $(node -v 2>/dev/null || echo notfound)"
-          echo "Node architecture: $(node -p 'process.arch' 2>/dev/null || echo notfound)"
-          echo "NPM version: $(npm -v 2>/dev/null || echo notfound)"
+          echo "🚀 Installing Node.js via nvm for Raspberry Pi..."
+          # Installa nvm
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-      - name: Install frontend dependencies (self-hosted ARM64)
-        if: contains(matrix.os, 'self-hosted')
-        shell: bash
-        run: |
-          echo "📦 Installing Node.js dependencies for ARM64 (no cache clean, no reinstall)..."
-          # Do not clean npm cache or node_modules, just install if needed
-          npm install --prefer-offline --no-audit --no-fund
+          # Installa Node.js 18 LTS
+          nvm install 18
+          nvm use 18
 
-      - name: Build frontend (self-hosted ARM64, retry Node.js if Illegal instruction)
-        if: contains(matrix.os, 'self-hosted')
-        shell: bash
-        run: |
-          echo "🎨 Building frontend for ARM64 (optimized, Node.js 20.19.5)..."
-          export NODE_OPTIONS="--max-old-space-size=4096"
-          if [[ "$(nproc)" -gt 2 ]]; then
-            export UV_THREADPOOL_SIZE=$(nproc)
-          fi
-          set +e
-          npm run build
-          BUILD_EXIT=$?
-          if [[ $BUILD_EXIT -eq 0 ]]; then
-            echo "✅ Frontend build succeeded."
-            exit 0
-          fi
-          if grep -q "Illegal instruction" npm-debug.log 2>/dev/null; then
-            echo "❗ Build failed with Illegal instruction. Reinstalling Node.js 20.19.5 and retrying..."
-            export NVM_DIR="$HOME/.nvm"
-            if [ ! -d "$NVM_DIR" ]; then
-              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
-            fi
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            nvm install 20.19.5 --default
-            nvm use 20.19.5
-            echo "Node.js version after reinstall: $(node -v)"
-            npm run build
-            exit $?
-          else
-            echo "❗ Build failed for another reason."
-            exit $BUILD_EXIT
-          fi
+          # Verifica installazione
+          echo "Node.js version: $(node -v)"
+          echo "Node architecture: $(node -p 'process.arch')"
+          echo "NPM version: $(npm -v)"
 
       - name: Setup Rust (self-hosted)
         if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.rust_ok != 'true'
@@ -364,6 +316,27 @@ jobs:
       # ========================================
       # BUILD FRONTEND (OTTIMIZZATO)
       # ========================================
+      - name: Install frontend dependencies (self-hosted ARM64)
+        if: contains(matrix.os, 'self-hosted')
+        shell: bash
+        run: |
+          echo "🧹 Cleaning previous Node modules and cache..."
+          rm -rf node_modules package-lock.json
+          npm cache clean --force
+          
+          echo "📦 Installing Node.js dependencies for ARM64 (build from source)..."
+          npm install --build-from-source --prefer-offline --no-audit --no-fund
+
+      - name: Build frontend (self-hosted ARM64)
+        if: contains(matrix.os, 'self-hosted')
+        shell: bash
+        run: |
+          echo "🎨 Building frontend for ARM64..."
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          if [[ "$(nproc)" -gt 2 ]]; then
+            export UV_THREADPOOL_SIZE=$(nproc)
+          fi
+          npm run build
 
       - name: Install frontend dependencies
         if: contains(matrix.os, 'self-hosted') == false
