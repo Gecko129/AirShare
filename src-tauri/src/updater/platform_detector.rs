@@ -252,7 +252,7 @@ impl PlatformDetector {
 }
 
 /// Informazioni dettagliate sulla piattaforma
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[allow(dead_code)]
 pub struct PlatformInfo {
     pub os: String,

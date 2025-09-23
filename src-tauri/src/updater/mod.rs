@@ -9,9 +9,6 @@ pub mod installer;
 pub mod storage;
 pub mod commands;
 
-// Re-export solo UpdaterState per facilità d'uso
-pub use commands::UpdaterState;
-
 // Re-export principali types per facilità d'uso
 pub use types::*;
 

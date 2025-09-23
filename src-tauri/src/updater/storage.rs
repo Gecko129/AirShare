@@ -342,7 +342,7 @@ impl StorageManager {
 }
 
 /// Statistiche sui controlli degli aggiornamenti
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[allow(dead_code)]
 pub struct UpdateStats {
     pub last_check_timestamp: u64,
@@ -380,7 +380,7 @@ impl UpdateStats {
 }
 
 /// Risultato della pulizia dei file vecchi
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[allow(dead_code)]
 pub struct CleanupResult {
     pub files_removed: u32,
