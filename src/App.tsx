@@ -10,22 +10,16 @@ import {
   Settings,
   Wifi,
   Send,
-  Smartphone,
-  Monitor,
   History,
-  QrCode,
   Zap,
 } from "lucide-react";
 import { DeviceDetection } from "./components/DeviceDetection";
 import { FileTransfer } from "./components/FileTransfer";
 import { Settings as SettingsComponent } from "./components/Settings";
-import { ImageWithFallback } from "./components/figma/ImageWithFallback";
 import { ThemeProvider } from "./components/ThemeProvider";
-import { GlassCard } from "./components/GlassCard";
 import { motion, AnimatePresence } from "motion/react";
 import { DynamicSidebar } from "./components/DynamicSidebar";
 import { TransferHistory } from "./components/TransferHistory";
-import { QRConnection } from "./components/QRConnection";
 import { CanvasBackground } from "./components/CanvasBackground";
 
 function AppContent() {
@@ -33,7 +27,7 @@ function AppContent() {
     [],
   );
   const [activeTab, setActiveTab] = useState("transfer");
-  const [networkSpeed, setNetworkSpeed] = useState(127.5); // MB/s
+  const [networkSpeed, setNetworkSpeed] = useState(100); // MB/s
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 relative overflow-hidden">
@@ -95,10 +89,10 @@ function AppContent() {
         >
           {/* Enhanced Navigation Tabs */}
           <div className="relative">
-            <TabsList className="grid w-full grid-cols-5 lg:w-[950px] h-16 bg-background/80 dark:bg-background/60 backdrop-blur-md border border-border/50 p-1">
+            <TabsList className="flex w-full lg:w-[950px] h-16 bg-background/80 dark:bg-background/60 backdrop-blur-md border border-border/50 p-1 gap-1">
               <TabsTrigger
                 value="transfer"
-                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent"
+                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
               >
                 <motion.div
                   className="absolute inset-2 bg-gradient-to-r from-blue-500/25 to-purple-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
@@ -121,7 +115,7 @@ function AppContent() {
               </TabsTrigger>
               <TabsTrigger
                 value="devices"
-                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent"
+                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
               >
                 <motion.div
                   className="absolute inset-2 bg-gradient-to-r from-green-500/25 to-blue-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
@@ -144,7 +138,7 @@ function AppContent() {
               </TabsTrigger>
               <TabsTrigger
                 value="history"
-                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent"
+                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
               >
                 <motion.div
                   className="absolute inset-2 bg-gradient-to-r from-orange-500/25 to-red-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
@@ -165,32 +159,30 @@ function AppContent() {
                   </span>
                 </div>
               </TabsTrigger>
-              <TabsTrigger
-                value="qr"
-                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent"
-              >
-                <motion.div
-                  className="absolute inset-2 bg-gradient-to-r from-purple-500/25 to-pink-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{
-                    opacity: activeTab === "qr" ? 1 : 0,
-                    scale: activeTab === "qr" ? 1 : 0.95,
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: "easeOut",
-                  }}
-                />
-                <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
-                  <QrCode className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    QR Code
-                  </span>
-                </div>
-              </TabsTrigger>
+              {/* <TabsTrigger
+  value="qr"
+  className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
+>
+  <motion.div
+    className="absolute inset-2 bg-gradient-to-r from-purple-500/25 to-pink-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{
+      opacity: activeTab === "qr" ? 1 : 0,
+      scale: activeTab === "qr" ? 1 : 0.95,
+    }}
+    transition={{
+      duration: 0.3,
+      ease: "easeOut",
+    }}
+  />
+  <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
+    <QrCode className="w-4 h-4" />
+    <span className="text-sm font-medium">QR Code</span>
+  </div>
+</TabsTrigger> */}
               <TabsTrigger
                 value="settings"
-                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent"
+                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
               >
                 <motion.div
                   className="absolute inset-2 bg-gradient-to-r from-gray-500/25 to-blue-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
@@ -357,45 +349,6 @@ function AppContent() {
                       selectedDevices={selectedDevices}
                       networkSpeed={networkSpeed}
                       context="history"
-                    />
-                  </motion.div>
-                </motion.div>
-              </TabsContent>
-            )}
-
-            {/* QR Code Tab */}
-            {activeTab === "qr" && (
-              <TabsContent value="qr" className="space-y-6">
-                <motion.div
-                  key="qr-content"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{
-                    duration: 0.4,
-                    ease: "easeInOut",
-                  }}
-                  className="grid lg:grid-cols-3 gap-6 relative z-30"
-                >
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1, duration: 0.3 }}
-                    className="lg:col-span-2 relative z-30"
-                  >
-                    <QRConnection />
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2, duration: 0.3 }}
-                    className="space-y-4 relative z-30"
-                  >
-                    <DynamicSidebar
-                      selectedDevices={selectedDevices}
-                      networkSpeed={networkSpeed}
-                      context="qr"
                     />
                   </motion.div>
                 </motion.div>

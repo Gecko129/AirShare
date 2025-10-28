@@ -91,6 +91,197 @@ fn calculate_eta(bytes_transferred: u64, total_bytes: u64, elapsed_ms: u128) -> 
     (eta_ms, eta_formatted)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TransferType {
+    Sent,
+    Received,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TransferStatus {
+    Completed,
+    Cancelled,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DeviceType {
+    Desktop,
+    Mobile,
+    Tablet,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferRecord {
+    pub id: String,
+    pub file_name: String,
+    pub file_size: u64,
+    #[serde(rename = "type")]
+    pub transfer_type: TransferType,
+    pub status: TransferStatus,
+    pub from_device: String,
+    pub to_device: String,
+    pub start_time: String,
+    pub duration: u64,
+    pub speed: f64,
+    pub device_type: DeviceType,
+}
+
+static RECENTS_LOCK: Lazy<TokioMutex<()>> = Lazy::new(|| TokioMutex::new(()));
+
+async fn save_recent_transfer(_app_handle: &AppHandle, record: &TransferRecord) -> anyhow::Result<()> {
+    let _guard = RECENTS_LOCK.lock().await;
+    // Usa dirs::data_dir come base e crea una sottocartella per l'app
+    let mut dir = dirs::data_dir().ok_or_else(|| anyhow::anyhow!("impossibile ottenere data_dir"))?;
+    dir.push("AirShare");
+    // AGGIUNGI QUESTO LOG
+    info!("📁 Recent transfers path: {:?}", dir.join("recent_transfers.json"));
+    if !dir.exists() {
+        tokio::fs::create_dir_all(&dir).await?;
+    }
+    let file_path = dir.join("recent_transfers.json");
+
+    // Leggi JSON esistente (array) oppure crea nuovo
+    let existing: Vec<TransferRecord> = match tokio::fs::read(&file_path).await {
+        Ok(bytes) => {
+            if bytes.is_empty() {
+                Vec::new()
+            } else {
+                match serde_json::from_slice::<Vec<TransferRecord>>(&bytes) {
+                    Ok(v) => v,
+                    Err(_) => Vec::new(),
+                }
+            }
+        }
+        Err(_) => Vec::new(),
+    };
+
+    let mut updated = existing;
+    updated.insert(0, record.clone());
+    // Mantieni solo gli ultimi 100 record per evitare crescita infinita
+    if updated.len() > 100 {
+        updated.truncate(100);
+    }
+
+    let json = serde_json::to_vec_pretty(&updated)?;
+    // Usa write atomico best-effort
+    let tmp_path = file_path.with_extension("json.tmp");
+    tokio::fs::write(&tmp_path, &json).await?;
+    tokio::fs::rename(&tmp_path, &file_path).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn add_recent_transfer(
+    app_handle: tauri::AppHandle,
+    file_name: String,
+    file_size: u64,
+    transfer_type: TransferType,
+    target_ip: String,
+    target_name: String,
+    elapsed_ms: u128,
+    status: TransferStatus,
+) -> Result<(), String> {
+    // Calcola velocità in MB/s
+    let duration_secs = (elapsed_ms as f64) / 1000.0;
+    let speed_mbps = if duration_secs > 0.0 {
+        (file_size as f64 / 1024.0 / 1024.0) / duration_secs
+    } else {
+        0.0
+    };
+
+    // Nome dispositivo locale
+    let local_device = hostname::get()
+        .ok()
+        .and_then(|h| h.into_string().ok())
+        .unwrap_or_else(|| "Unknown Device".to_string());
+
+    let (from_device, to_device) = match transfer_type {
+        TransferType::Sent => (local_device, target_name.clone()),
+        TransferType::Received => (target_name.clone(), local_device),
+    };
+
+    let record = TransferRecord {
+        id: uuid::Uuid::new_v4().to_string(),
+        file_name,
+        file_size,
+        transfer_type,
+        status,
+        from_device,
+        to_device,
+        start_time: chrono::Utc::now().to_rfc3339(),
+        duration: (elapsed_ms / 1000) as u64,
+        speed: speed_mbps,
+        device_type: DeviceType::Desktop,
+    };
+
+    save_recent_transfer(&app_handle, &record)
+        .await
+        .map_err(|e| format!("failed to save recent transfer: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_recent_transfers() -> Result<Vec<TransferRecord>, String> {
+    let mut dir = dirs::data_dir()
+        .ok_or_else(|| "impossibile ottenere data_dir".to_string())?;
+    dir.push("AirShare");
+    dir.push("recent_transfers.json");
+    match tokio::fs::read(&dir).await {
+        Ok(bytes) if !bytes.is_empty() => {
+            serde_json::from_slice::<Vec<TransferRecord>>(&bytes)
+                .map_err(|e| format!("Failed to parse transfers: {}", e))
+        }
+        Ok(_) => Ok(Vec::new()),
+        Err(e) => Err(format!("Failed to read file: {}", e)),
+    }
+}
+
+async fn delete_transfer_by_id(transfer_id: &str) -> anyhow::Result<()> {
+    let _guard = RECENTS_LOCK.lock().await;
+    let mut dir = dirs::data_dir()
+        .ok_or_else(|| anyhow::anyhow!("impossibile ottenere data_dir"))?;
+    dir.push("AirShare");
+    
+    if !dir.exists() {
+        return Ok(());
+    }
+    
+    let file_path = dir.join("recent_transfers.json");
+    
+    let existing: Vec<TransferRecord> = match tokio::fs::read(&file_path).await {
+        Ok(bytes) if !bytes.is_empty() => {
+            match serde_json::from_slice::<Vec<TransferRecord>>(&bytes) {
+                Ok(v) => v,
+                Err(_) => Vec::new(),
+            }
+        }
+        _ => Vec::new(),
+    };
+    
+    let updated: Vec<TransferRecord> = existing.into_iter()
+        .filter(|t| t.id != transfer_id)
+        .collect();
+    
+    let json = serde_json::to_vec_pretty(&updated)?;
+    let tmp_path = file_path.with_extension("json.tmp");
+    tokio::fs::write(&tmp_path, &json).await?;
+    tokio::fs::rename(&tmp_path, &file_path).await?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_recent_transfer(transfer_id: String) -> Result<(), String> {
+    delete_transfer_by_id(&transfer_id)
+        .await
+        .map_err(|e| format!("failed to delete transfer: {}", e))
+}
+
 /// Get file information for a given file path
 #[tauri::command]
 pub fn get_file_info(file_path: String) -> Result<FileInfo, String> {
@@ -486,6 +677,18 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             info!("({addr}) File transfer complete: {:?}", temp_path);
             tauri_log(&app_handle, "info", format!("receive complete | id={} ip={} port={} path={}", transfer_id, addr.ip(), addr.port(), temp_path.display())).await;
 
+            // Registra nella cronologia (ricezione completata)
+            let _ = add_recent_transfer(
+                app_handle.clone(),
+                offer.file_name.clone(),
+                offer.file_size,
+                TransferType::Received,
+                addr.ip().to_string(),
+                addr.ip().to_string(),
+                transfer_start.elapsed().as_millis(),
+                TransferStatus::Completed,
+            ).await;
+
             // --- PATCH: Do NOT remove batch entry here. Removal must be done only when all files in the batch are complete. ---
             // The entry for batch_id will persist until explicit cleanup logic is added (not here).
 
@@ -535,6 +738,7 @@ pub async fn send_file_with_progress(
     overall_total: Option<u64>,
     batch_id: Option<String>,
 ) -> anyhow::Result<()> {
+    let overall_start = Instant::now();
     let default_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file").to_string();
     let display_name = file_name.as_ref().unwrap_or(&default_name);
     let file_info = if let (Some(idx), Some(total)) = (file_index, total_files) {
@@ -600,6 +804,16 @@ pub async fn send_file_with_progress(
         Err(e) => {
             error!("Failed to connect to target {}: {}", addr, e);
             tauri_log(&app_handle, "error", format!("Failed to connect to {}: {}", addr, e)).await;
+            let _ = add_recent_transfer(
+                app_handle.clone(),
+                actual_file_name.clone(),
+                file_size,
+                TransferType::Sent,
+                target_ip.clone(),
+                target_ip.clone(),
+                overall_start.elapsed().as_millis(),
+                TransferStatus::Failed,
+            ).await;
             return Err(e.into());
         }
     };
@@ -614,6 +828,16 @@ pub async fn send_file_with_progress(
     if let Err(e) = stream.write_all(header_line.as_bytes()).await {
         error!("Failed to send header: {}", e);
         tauri_log(&app_handle, "error", format!("Failed to send header to {}: {}", addr, e)).await;
+        let _ = add_recent_transfer(
+            app_handle.clone(),
+            actual_file_name.clone(),
+            file_size,
+            TransferType::Sent,
+            target_ip.clone(),
+            target_ip.clone(),
+            overall_start.elapsed().as_millis(),
+            TransferStatus::Failed,
+        ).await;
         return Err(e.into());
     }
     if let Err(e) = stream.flush().await {
@@ -632,6 +856,16 @@ pub async fn send_file_with_progress(
         if let Err(e) = stream.read_exact(&mut byte).await {
             error!("Failed to read ack byte: {}", e);
             tauri_log(&app_handle, "error", format!("Failed to read ack from {}: {}", addr, e)).await;
+            let _ = add_recent_transfer(
+                app_handle.clone(),
+                actual_file_name.clone(),
+                file_size,
+                TransferType::Sent,
+                target_ip.clone(),
+                target_ip.clone(),
+                overall_start.elapsed().as_millis(),
+                TransferStatus::Failed,
+            ).await;
             return Err(e.into());
         }
         if byte[0] == b'\n' {
@@ -666,6 +900,16 @@ pub async fn send_file_with_progress(
         let err_msg = ack_json.get("error").and_then(|v| v.as_str()).unwrap_or("rejected");
         error!("Transfer rejected by peer: {}", err_msg);
         tauri_log(&app_handle, "error", format!("Transfer rejected by {}: {}", addr, err_msg)).await;
+        let _ = add_recent_transfer(
+            app_handle.clone(),
+            actual_file_name.clone(),
+            file_size,
+            TransferType::Sent,
+            target_ip.clone(),
+            target_ip.clone(),
+            overall_start.elapsed().as_millis(),
+            TransferStatus::Cancelled,
+        ).await;
         anyhow::bail!("Transfer rejected by peer: {}", err_msg);
     }
     info!("Ack accepted by server. Beginning binary transfer of {} bytes (transfer_id={})", file_size, transfer_id);
@@ -676,6 +920,16 @@ pub async fn send_file_with_progress(
         Ok(f) => f,
         Err(e) => {
             error!("Failed to open file: {}", e);
+            let _ = add_recent_transfer(
+                app_handle.clone(),
+                actual_file_name.clone(),
+                file_size,
+                TransferType::Sent,
+                target_ip.clone(),
+                target_ip.clone(),
+                overall_start.elapsed().as_millis(),
+                TransferStatus::Failed,
+            ).await;
             return Err(e.into());
         }
     };
@@ -689,6 +943,16 @@ pub async fn send_file_with_progress(
             Ok(n) => n,
             Err(e) => {
                 error!("File read error: {}", e);
+                let _ = add_recent_transfer(
+                    app_handle.clone(),
+                    actual_file_name.clone(),
+                    file_size,
+                    TransferType::Sent,
+                    target_ip.clone(),
+                    target_ip.clone(),
+                    overall_start.elapsed().as_millis(),
+                    TransferStatus::Failed,
+                ).await;
                 return Err(e.into());
             }
         };
@@ -696,6 +960,16 @@ pub async fn send_file_with_progress(
         if let Err(e) = stream.write_all(&buffer[..n]).await {
             error!("Failed to send file chunk at {} bytes: {}", sent, e);
             tauri_log(&app_handle, "error", format!("Failed to send chunk at {} to {}: {}", sent, addr, e)).await;
+            let _ = add_recent_transfer(
+                app_handle.clone(),
+                actual_file_name.clone(),
+                file_size,
+                TransferType::Sent,
+                target_ip.clone(),
+                target_ip.clone(),
+                overall_start.elapsed().as_millis(),
+                TransferStatus::Failed,
+            ).await;
             return Err(e.into());
         }
         sent += n as u64;
@@ -888,6 +1162,19 @@ pub async fn send_file_with_progress(
             batch_info
         )
     ).await;
+    // Salvataggio record completato (invio)
+    let elapsed_ms = overall_start.elapsed().as_millis();
+    let _ = add_recent_transfer(
+        app_handle.clone(),
+        actual_file_name.clone(),
+        file_size,
+        TransferType::Sent,
+        target_ip.clone(),
+        target_ip.clone(),
+        elapsed_ms,
+        TransferStatus::Completed,
+    ).await;
+
     // Funzione di dialogo rimossa come richiesto
     Ok(())
 }

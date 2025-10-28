@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { GlassCard } from './GlassCard';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -14,16 +14,13 @@ import {
   CheckCircle, 
   AlertCircle, 
   Clock,
-  Filter,
-  CalendarDays,
   ArrowUpDown,
-  MoreHorizontal,
-  Trash2,
-  RotateCcw,
-  Share2
+  Trash2
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 interface TransferRecord {
   id: string;
@@ -39,81 +36,72 @@ interface TransferRecord {
   deviceType: 'mobile' | 'desktop';
 }
 
-// Mock data for demonstration
-const mockTransfers: TransferRecord[] = [
-  {
-    id: '1',
-    fileName: 'Vacation_Photos_2024.zip',
-    fileSize: 2.4 * 1024 * 1024 * 1024, // 2.4 GB
-    type: 'sent',
-    status: 'completed',
-    fromDevice: 'MacBook Pro',
-    toDevice: 'iPhone 15 Pro',
-    startTime: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    duration: 180,
-    speed: 127.5,
-    deviceType: 'mobile'
-  },
-  {
-    id: '2',
-    fileName: 'Project_Presentation.pptx',
-    fileSize: 45 * 1024 * 1024, // 45 MB
-    type: 'received',
-    status: 'completed',
-    fromDevice: 'Dell XPS 13',
-    toDevice: 'MacBook Pro',
-    startTime: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-    duration: 12,
-    speed: 98.2,
-    deviceType: 'desktop'
-  },
-  {
-    id: '3',
-    fileName: 'Video_Tutorial_4K.mp4',
-    fileSize: 1.8 * 1024 * 1024 * 1024, // 1.8 GB
-    type: 'sent',
-    status: 'failed',
-    fromDevice: 'MacBook Pro',
-    toDevice: 'Android Tablet',
-    startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-    duration: 0,
-    speed: 0,
-    deviceType: 'mobile'
-  },
-  {
-    id: '4',
-    fileName: 'Document_Archive.pdf',
-    fileSize: 125 * 1024 * 1024, // 125 MB
-    type: 'received',
-    status: 'completed',
-    fromDevice: 'Surface Pro',
-    toDevice: 'MacBook Pro',
-    startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-    duration: 45,
-    speed: 89.3,
-    deviceType: 'desktop'
-  },
-  {
-    id: '5',
-    fileName: 'Music_Collection.zip',
-    fileSize: 850 * 1024 * 1024, // 850 MB
-    type: 'sent',
-    status: 'cancelled',
-    fromDevice: 'MacBook Pro',
-    toDevice: 'iPhone 13',
-    startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-    duration: 0,
-    speed: 0,
-    deviceType: 'mobile'
-  }
-];
+interface BackendTransferRecord {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  transferType: 'sent' | 'received';
+  status: 'completed' | 'cancelled' | 'failed';
+  fromDevice: string;
+  toDevice: string;
+  startTime: string;
+  duration: number;
+  speed: number;
+  deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+}
 
 export function TransferHistory() {
-  const [transfers] = useState<TransferRecord[]>(mockTransfers);
+  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'sent' | 'received'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'failed' | 'cancelled'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'size' | 'speed'>('date');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [transferToDelete, setTransferToDelete] = useState<TransferRecord | null>(null);
+
+  const loadTransfers = async () => {
+    try {
+      const data = await invoke<BackendTransferRecord[]>('get_recent_transfers');
+      const parsed = data.map(t => ({
+        id: t.id,
+        fileName: t.fileName,
+        fileSize: t.fileSize,
+        type: t.transferType,
+        status: t.status,
+        fromDevice: t.fromDevice,
+        toDevice: t.toDevice,
+        startTime: new Date(t.startTime),
+        duration: t.duration,
+        speed: t.speed,
+        deviceType: (t.deviceType === 'desktop' ? 'desktop' : 'mobile') as 'mobile' | 'desktop',
+      }));
+      setTransfers(parsed);
+      console.log('Loaded transfers:', parsed.length);
+    } catch (e) {
+      console.error('Failed to load transfers:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Carica trasferimenti al mount
+  useEffect(() => {
+    loadTransfers();
+  }, []);
+
+  // Ascolta eventi di completamento trasferimento per ricaricare i dati
+  useEffect(() => {
+    let unlistenComplete: (() => void) | undefined;
+    (async () => {
+      unlistenComplete = await listen('transfer_complete', () => {
+        loadTransfers();
+      });
+    })();
+    return () => {
+      if (unlistenComplete) unlistenComplete();
+    };
+  }, []);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -197,6 +185,29 @@ export function TransferHistory() {
   const totalDataTransferred = transfers
     .filter(t => t.status === 'completed')
     .reduce((acc, t) => acc + t.fileSize, 0);
+
+  const handleDeleteClick = (transfer: TransferRecord) => {
+    setTransferToDelete(transfer);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (transferToDelete) {
+      try {
+        await invoke('delete_recent_transfer', { transferId: transferToDelete.id });
+        setTransfers(prev => prev.filter(t => t.id !== transferToDelete.id));
+      } catch (e) {
+        console.error('Failed to delete transfer:', e);
+      }
+    }
+    setDeleteDialogOpen(false);
+    setTransferToDelete(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setTransferToDelete(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -288,7 +299,12 @@ export function TransferHistory() {
       {/* Transfer List */}
       <GlassCard className="p-4">
         <div className="space-y-4">
-          {filteredTransfers.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p>Caricamento trasferimenti...</p>
+            </div>
+          ) : filteredTransfers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <File className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>Nessun trasferimento trovato</p>
@@ -352,34 +368,42 @@ export function TransferHistory() {
                 </div>
 
                 {/* Actions */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {transfer.status === 'failed' && (
-                      <DropdownMenuItem>
-                        <RotateCcw className="w-4 h-4 mr-2" />
-                        Riprova Trasferimento
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem>
-                      <Share2 className="w-4 h-4 mr-2" />
-                      Condividi di Nuovo
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Rimuovi dalla Cronologia
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteClick(transfer)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </motion.div>
             ))
           )}
         </div>
       </GlassCard>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sei sicuro di voler eliminare questo trasferimento? Questa azione non può essere annullata.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDeleteCancel} className="bg-gray-500 text-white hover:bg-gray-600">
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Conferma
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

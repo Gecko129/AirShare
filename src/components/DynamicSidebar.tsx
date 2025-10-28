@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { GlassCard } from './GlassCard';
 import { Badge } from './ui/badge';
-import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { 
   Wifi, 
@@ -10,10 +9,7 @@ import {
   Zap, 
   Shield, 
   Clock, 
-  Archive, 
   Share2, 
-  Download, 
-  Upload,
   Cpu,
   HardDrive,
   BarChart3,
@@ -48,136 +44,91 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
   const [cpuUsage] = useState(Math.floor(Math.random() * 40) + 20);
   const [memoryUsage] = useState(Math.floor(Math.random() * 30) + 40);
 
-  // Dynamic tips based on context
   const getTips = (): TipContent[] => {
-    const baseTips = [
+    const baseTips: TipContent[] = [
       {
         icon: <Zap className="w-4 h-4" />,
-        title: "Ottimizzazione Velocità",
+        title: "Ottimizzazione",
         content: [
-          "• Chiudi le app non necessarie",
-          "• Usa cavo ethernet se possibile", 
-          "• Comprimi file grandi prima del trasferimento",
-          "• Evita altre attività di rete"
+          "Chiudi app non necessarie",
+          "Usa cavo Ethernet",
+          "Comprimi file grandi"
         ]
       },
       {
         icon: <Shield className="w-4 h-4" />,
-        title: "Sicurezza Avanzata",
+        title: "Sicurezza",
         content: [
-          "• Crittografia AES-256 end-to-end",
-          "• Verifica fingerprint dispositivi",
-          "• Nessun dato passa per server esterni",
-          "• Autenticazione biometrica disponibile"
-        ]
-      },
-      {
-        icon: <Archive className="w-4 h-4" />,
-        title: "Compressione Intelligente",
-        content: [
-          "• Compressione automatica per immagini",
-          "• Algoritmi ottimizzati per video",
-          "• Risparmio fino al 70% di tempo",
-          "• Qualità preservata"
+          "Crittografia AES-256",
+          "Peer-to-peer sicuro",
+          "Nessun server esterno"
         ]
       },
       {
         icon: <Clock className="w-4 h-4" />,
-        title: "Trasferimenti Programmati",
+        title: "Velocità",
         content: [
-          "• Programma trasferimenti notturni",
-          "• Code intelligenti per file grandi",
-          "• Pausa/ripresa automatica",
-          "• Sincronizzazione bidirezionale"
+          "WiFi 5GHz consigliato",
+          "Connessione stabile richiesta",
+          "Monitora la rete"
         ]
       }
     ];
 
-    const contextTips: Record<string, TipContent[]> = {
-      transfer: [
-        {
-          icon: <Share2 className="w-4 h-4" />,
-          title: "Drag & Drop Avanzato",
-          content: [
-            "• Trascina cartelle intere",
-            "• Anteprima automatica immagini",
-            "• Supporto per 500+ formati",
-            "• Gestione conflitti nomi file"
-          ]
-        },
-        ...baseTips
-      ],
-      devices: [
-        {
-          icon: <Wifi className="w-4 h-4" />,
-          title: "Rilevamento Intelligente",
-          content: [
-            "• Scansione automatica rete",
-            "• Cache dispositivi fidati",
-            "• Wake-on-LAN per PC",
-            "• Hotspot mobile supportato"
-          ]
-        },
-        ...baseTips
-      ],
-      history: [
-        {
-          icon: <BarChart3 className="w-4 h-4" />,
-          title: "Analytics Dettagliati",
-          content: [
-            "• Statistiche velocità per dispositivo",
-            "• Analisi pattern di utilizzo",
-            "• Report mensili automatici",
-            "• Backup cronologia cloud"
-          ]
-        },
-        ...baseTips
-      ],
-      qr: [
-        {
-          icon: <Share2 className="w-4 h-4" />,
-          title: "Connessioni Rapide",
-          content: [
-            "• QR codes con scadenza temporale",
-            "• Condivisione guest temporanea",
-            "• Link di invito monouso",
-            "• Connessioni automatiche WiFi"
-          ]
-        },
-        ...baseTips
-      ],
-      settings: [
-        {
-          icon: <Lightbulb className="w-4 h-4" />,
-          title: "Personalizzazione",
-          content: [
-            "• Temi personalizzati",
-            "• Shortcuts personalizzabili",
-            "• Notifiche intelligenti",
-            "• Automazioni avanzate"
-          ]
-        },
-        ...baseTips
-      ]
+    const contextSpecificTips: Record<string, TipContent> = {
+      transfer: {
+        icon: <Share2 className="w-4 h-4" />,
+        title: "Trasferimento",
+        content: [
+          "Trascina cartelle o più file",
+          "Anteprima immagini",
+          "Gestione duplicati automatica"
+        ]
+      },
+      devices: {
+        icon: <Wifi className="w-4 h-4" />,
+        title: "Dispositivi",
+        content: [
+          "Scansione automatica rete",
+          "Cache dispositivi affidabili",
+          "Supporto hotspot mobile"
+        ]
+      },
+      history: {
+        icon: <BarChart3 className="w-4 h-4" />,
+        title: "Storico",
+        content: [
+          "Statistiche per dispositivo",
+          "Analisi mensile utilizzo",
+          "Backup cronologia online"
+        ]
+      },
+      qr: {
+        icon: <Share2 className="w-4 h-4" />,
+        title: "QR",
+        content: [
+          "QR code temporanei",
+          "Inviti guest a tempo",
+          "Link monouso sicuri"
+        ]
+      },
+      settings: {
+        icon: <Lightbulb className="w-4 h-4" />,
+        title: "Impostazioni",
+        content: [
+          "Diverse opzioni di lingua",
+          "Scorciatoie rapide",
+          "Notifiche smart",
+        ]
+      }
     };
 
-    return contextTips[context] || baseTips;
+    const specificTip = contextSpecificTips[context];
+    return specificTip ? [specificTip, ...baseTips] : baseTips;
   };
 
   const getStats = (): StatsContent[] => {
     return [
-      {
-        icon: <Download className="w-4 h-4" />,
-        title: "Download Oggi",
-        value: "2.4 GB",
-        trend: 'up'
-      },
-      {
-        icon: <Upload className="w-4 h-4" />,
-        title: "Upload Oggi", 
-        value: "1.8 GB",
-        trend: 'up'
-      },
       {
         icon: <Activity className="w-4 h-4" />,
         title: "Trasferimenti",
@@ -220,7 +171,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentStatsIndex((prev) => (prev + 1) % stats.length);
-    }, 3000);
+    }, 4000);
     return () => clearInterval(interval);
   }, [stats.length]);
 
@@ -335,35 +286,52 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
         <div className="flex items-center justify-between mb-3">
           <h3>Suggerimenti Pro</h3>
           <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            animate={{ 
+              scale: [1, 1.1, 1],
+              opacity: [0.8, 1, 0.8]
+            }}
+            transition={{ 
+              duration: 2, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
           >
-            <Lightbulb className="w-4 h-4 text-yellow-500" />
+            <Lightbulb className="w-4 h-4 text-yellow-500 fill-yellow-500/20" />
           </motion.div>
         </div>
         
         <AnimatePresence mode="wait">
           <motion.div
             key={currentTipIndex}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.4 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
           >
-            <div className="flex items-center gap-2 mb-2">
-              {tips[currentTipIndex].icon}
+            <div className="flex items-center gap-2 mb-3">
+              <motion.div
+                key={currentTipIndex}
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ duration: 0.4, type: "spring", stiffness: 200 }}
+                className="text-primary"
+              >
+                {tips[currentTipIndex].icon}
+              </motion.div>
               <h4 className="font-medium text-sm">{tips[currentTipIndex].title}</h4>
             </div>
-            <div className="space-y-1 text-sm text-muted-foreground">
+            <div className="space-y-2 text-sm text-muted-foreground">
               {tips[currentTipIndex].content.map((tip, index) => (
-                <motion.p
+                <motion.div
                   key={index}
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
+                  transition={{ delay: index * 0.08, duration: 0.3 }}
+                  className="flex items-start gap-2"
                 >
-                  {tip}
-                </motion.p>
+                  <span className="text-primary mt-0.5 flex-shrink-0">→</span>
+                  <span className="leading-relaxed">{tip}</span>
+                </motion.div>
               ))}
             </div>
           </motion.div>
@@ -383,63 +351,6 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
         </div>
       </GlassCard>
 
-      {/* Quick Actions based on context */}
-      <GlassCard className="p-4">
-        <h3 className="mb-3">Azioni Rapide</h3>
-        <div className="space-y-2">
-          {context === 'transfer' && (
-            <>
-              <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                <Archive className="w-4 h-4" />
-                Comprimi File
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                <Clock className="w-4 h-4" />
-                Programma Trasferimento
-              </Button>
-            </>
-          )}
-          
-          {context === 'devices' && (
-            <>
-              <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                <Wifi className="w-4 h-4" />
-                Scansiona Rete
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                <Share2 className="w-4 h-4" />
-                Invita Dispositivo
-              </Button>
-            </>
-          )}
-
-          {context === 'history' && (
-            <>
-              <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                <Download className="w-4 h-4" />
-                Esporta Report
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                <BarChart3 className="w-4 h-4" />
-                Visualizza Statistiche
-              </Button>
-            </>
-          )}
-
-          {(context === 'qr' || context === 'settings') && (
-            <>
-              <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                <Shield className="w-4 h-4" />
-                Test Sicurezza
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                <Zap className="w-4 h-4" />
-                Ottimizza Prestazioni
-              </Button>
-            </>
-          )}
-        </div>
-      </GlassCard>
     </div>
   );
 }
