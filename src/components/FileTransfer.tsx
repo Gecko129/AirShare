@@ -371,22 +371,24 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
     setGeneralProgress({});
     toast.info(t("transfer_start", { fileCount: selectedFiles.length, deviceCount: selectedDevices.length }));
 
-    const sendToDevice = async (deviceId: string) => {
+    const sendToDevice = async (deviceRef: any) => {
       // Trova device in allDevices per ottenere IP e porta corretti
       let targetIp = '';
       let targetPort = 0;
+      // Normalizza l'identificatore in stringa se necessario
+      const deviceId = typeof deviceRef === 'string' ? deviceRef : (deviceRef?.id ?? deviceRef?.ip ?? String(deviceRef ?? ''));
       // Prova a trovare il device in allDevices per port
       const foundDevice = allDevices.find(d => d.id === deviceId);
       if (foundDevice) {
         const device = foundDevice as Device;
         targetIp = device.ip;
         targetPort = typeof device.port === 'number' ? device.port : 40124;
-      } else if (deviceId.includes(':')) {
+      } else if (typeof deviceId === 'string' && deviceId.includes(':')) {
         const [ip, port] = deviceId.split(':');
         targetIp = ip;
         targetPort = Number.isNaN(Number(port)) ? 40124 : parseInt(port, 10);
       } else {
-        targetIp = deviceId;
+        targetIp = String(deviceId);
         targetPort = 40124;
       }
 
@@ -525,8 +527,9 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             </span>
           </div>
           <div className="space-y-2">
-            {selectedDevices.map(deviceId => {
+            {selectedDevices.map(deviceRef => {
               // Trova device in allDevices per ottenere IP e porta corretti
+              const deviceId = typeof deviceRef === 'string' ? deviceRef : (deviceRef as any)?.id ?? (deviceRef as any)?.ip ?? String(deviceRef ?? '');
               const foundDevice = allDevices.find(d => d.id === deviceId);
               let ip: string;
               let port: number;
@@ -536,13 +539,13 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                 ip = device.ip;
                 port = typeof device.port === "string" ? parseInt(device.port, 10) || 40124 : device.port ?? 40124;
                 name = device.name ?? "Dispositivo";
-              } else if (deviceId.includes(':')) {
+              } else if (typeof deviceId === 'string' && deviceId.includes(':')) {
                 const [parsedIp, parsedPort] = deviceId.split(':');
                 ip = parsedIp;
                 port = parseInt(parsedPort, 10) || 40124;
                 name = "Dispositivo";
               } else {
-                ip = deviceId;
+                ip = String(deviceId);
                 port = 40124;
                 name = "Dispositivo";
               }

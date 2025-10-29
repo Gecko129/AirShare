@@ -33,10 +33,8 @@ export function TransferPrompt() {
     try {
       // Correzione: usa la struttura corretta dei parametri
       await invoke("respond_transfer", {
-        args: {
-          transfer_id: transfer.offer?.transfer_id || transfer.transfer_id || transfer.id,
-          accept,
-        }
+        transfer_id: transfer.offer?.transfer_id || transfer.transfer_id || transfer.id,
+        accept,
       });
     } catch (error) {
       console.error("Errore durante la risposta al trasferimento:", error);

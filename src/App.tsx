@@ -1,136 +1,412 @@
-import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
-import { DeviceList } from './components/DeviceList';
-import { FileTransfer } from './components/FileTransfer';
-import { Waves, Zap, Settings } from 'lucide-react';
-import { TransferPrompt } from './components/TransferPrompt';
-import SettingsPanel from './components/SettingsPanel';
-import './i18n';
-import { Toaster } from './components/ui/sonner';
+import { useState } from "react";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "./components/ui/tabs";
+import { Badge } from "./components/ui/badge";
+import {
+  Settings,
+  Wifi,
+  Send,
+  History,
+  Zap,
+} from "lucide-react";
+import { DeviceDetection } from "./components/DeviceDetection";
+import { FileTransfer } from "./components/FileTransfer";
+import { Settings as SettingsComponent } from "./components/Settings";
+import { ThemeProvider } from "./components/ThemeProvider";
+import { motion, AnimatePresence } from "motion/react";
+import { DynamicSidebar } from "./components/DynamicSidebar";
+import { TransferHistory } from "./components/TransferHistory";
+import { CanvasBackground } from "./components/CanvasBackground";
 
-export default function App() {
-  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
-  const { t } = useTranslation();
-
-  const handleDeviceSelectionChange = (deviceIds: string[]) => {
-    setSelectedDevices(deviceIds);
-  };
-
-  // Genera array di particelle in modo sicuro
-  const particles = Array.from({ length: 15 }, (_, i) => ({
-    id: i,
-    left: Math.random() * 100,
-    top: Math.random() * 100,
-    delay: Math.random() * 3,
-    duration: 4 + Math.random() * 2
-  }));
+function AppContent() {
+  const [selectedDevices, setSelectedDevices] = useState<any[]>(
+    [],
+  );
+  const [activeTab, setActiveTab] = useState("transfer");
+  const [networkSpeed, setNetworkSpeed] = useState(100); // MB/s
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black relative overflow-hidden">
-      <Toaster richColors position="bottom-right" />
-      {/* Animated background elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-10 left-10 w-32 h-32 bg-gray-700/10 rounded-full blur-xl animate-pulse" />
-        <div 
-          className="absolute top-40 right-20 w-24 h-24 bg-slate-600/10 rounded-full blur-lg animate-pulse" 
-          style={{ animationDelay: '1s' }} 
-        />
-        <div 
-          className="absolute bottom-20 left-1/4 w-40 h-40 bg-gray-800/10 rounded-full blur-2xl animate-pulse" 
-          style={{ animationDelay: '2s' }} 
-        />
-        <div 
-          className="absolute bottom-40 right-1/3 w-28 h-28 bg-slate-700/10 rounded-full blur-xl animate-pulse" 
-          style={{ animationDelay: '3s' }} 
-        />
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 relative overflow-hidden">
+      {/* Ambient background orbs for liquid glass effect */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/4 dark:bg-blue-400/2 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-3/4 right-1/4 w-80 h-80 bg-purple-500/4 dark:bg-purple-400/2 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute bottom-1/4 left-1/2 w-64 h-64 bg-pink-500/4 dark:bg-pink-400/2 rounded-full blur-3xl animate-pulse delay-2000" />
       </div>
-
-      {/* Floating particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {particles.map((particle) => (
-          <div
-            key={particle.id}
-            className="absolute w-1 h-1 bg-gray-400/20 rounded-full animate-bounce"
-            style={{
-              left: `${particle.left}%`,
-              top: `${particle.top}%`,
-              animationDelay: `${particle.delay}s`,
-              animationDuration: `${particle.duration}s`
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Main content */}
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-gray-800/40 to-slate-700/40 backdrop-blur-md border border-gray-600/30">
-              <Zap className="w-12 h-12 text-gray-100" />
-            </div>
-            <div className="text-left">
-              <h1 className="text-4xl text-gray-100 mb-2">AirShare</h1>
-              <p className="text-gray-400 text-lg">{t("app_subtitle")}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-center gap-2 text-gray-500">
-            <Waves className="w-5 h-5 animate-pulse" />
-            <span>{t("listening_devices")}</span>
-          </div>
-        </div>
-
-        {/* Main content - Flexible layout that adapts to content */}
-        <div className="max-w-[1600px] mx-auto">
-          <div className="grid xl:grid-cols-[1fr_1fr] lg:grid-cols-1 gap-8 items-start">
-            {/* Device list - Can expand based on content */}
-            <div className="order-1 w-full">
-              <DeviceList 
-                selectedDevices={selectedDevices}
-                onSelectionChange={handleDeviceSelectionChange}
-              />
+      {/* Header */}
+      <header className="border-b backdrop-blur-md bg-background/85 dark:bg-background/70 sticky top-0 z-50 relative">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary rounded-lg shadow-sm">
+                <Send className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold">
+                  AirShare
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Trasferimento file cross-platform
+                </p>
+              </div>
             </div>
 
-            {/* File transfer - Matches device list width */}
-            <div className="order-2 w-full">
-              <FileTransfer selectedDevices={selectedDevices} />
+            <div className="flex items-center gap-3">
+              <Badge
+                variant="outline"
+                className="gap-2 bg-background/50 dark:bg-background/30 backdrop-blur-sm"
+              >
+                <Zap className="w-3 h-3 text-green-500" />
+                {networkSpeed} MB/s
+              </Badge>
+              <Badge
+                variant="outline"
+                className="gap-1 bg-background/50 dark:bg-background/30 backdrop-blur-sm"
+              >
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                Online
+              </Badge>
             </div>
           </div>
         </div>
+      </header>
 
-        {/* Stats footer */}
-        <div className="mt-12 text-center">
-          <div className="inline-flex items-center gap-6 px-6 py-3 rounded-full backdrop-blur-md bg-gray-900/60 border border-gray-700/40">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-gray-400 text-sm">{t("airshare_active")}</span>
-            </div>
-            <div className="w-px h-4 bg-gray-700/60" />
-            <div className="flex items-center gap-2">
-              <span className="text-gray-400 text-sm">{t("devices_selected", { count: selectedDevices.length })}</span>
-            </div>
-            <div className="w-px h-4 bg-gray-700/60" />
-            <div className="flex items-center gap-2">
-              <span className="text-gray-400 text-sm">{t("scanning_interval")}</span>
-            </div>
-          </div>
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-6 py-8 relative z-10">
+        {/* Canvas Background */}
+        <div className="absolute inset-0 pointer-events-none">
+          <CanvasBackground />
         </div>
-      </div>
-      <TransferPrompt />
-      {/* Settings gear - fixed bottom left */}
-      <button
-        aria-label="Apri impostazioni"
-        className="fixed bottom-4 left-4 z-50 inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white shadow"
-        onClick={() => setSettingsOpen(true)}
-      >
-        <Settings className="w-5 h-5" />
-      </button>
 
-      {/* Settings Panel */}
-      <SettingsPanel open={settingsOpen} onOpenChange={setSettingsOpen} />
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6 relative z-20"
+        >
+          {/* Enhanced Navigation Tabs */}
+          <div className="relative">
+            <TabsList className="flex w-full lg:w-[950px] h-16 bg-background/80 dark:bg-background/60 backdrop-blur-md border border-border/50 p-1 gap-1">
+              <TabsTrigger
+                value="transfer"
+                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
+              >
+                <motion.div
+                  className="absolute inset-2 bg-gradient-to-r from-blue-500/25 to-purple-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{
+                    opacity: activeTab === "transfer" ? 1 : 0,
+                    scale: activeTab === "transfer" ? 1 : 0.95,
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: "easeOut",
+                  }}
+                />
+                <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
+                  <Send className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    Trasferimento
+                  </span>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger
+                value="devices"
+                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
+              >
+                <motion.div
+                  className="absolute inset-2 bg-gradient-to-r from-green-500/25 to-blue-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{
+                    opacity: activeTab === "devices" ? 1 : 0,
+                    scale: activeTab === "devices" ? 1 : 0.95,
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: "easeOut",
+                  }}
+                />
+                <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
+                  <Wifi className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    Dispositivi
+                  </span>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger
+                value="history"
+                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
+              >
+                <motion.div
+                  className="absolute inset-2 bg-gradient-to-r from-orange-500/25 to-red-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{
+                    opacity: activeTab === "history" ? 1 : 0,
+                    scale: activeTab === "history" ? 1 : 0.95,
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: "easeOut",
+                  }}
+                />
+                <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
+                  <History className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    Cronologia
+                  </span>
+                </div>
+              </TabsTrigger>
+              {/* <TabsTrigger
+  value="qr"
+  className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
+>
+  <motion.div
+    className="absolute inset-2 bg-gradient-to-r from-purple-500/25 to-pink-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{
+      opacity: activeTab === "qr" ? 1 : 0,
+      scale: activeTab === "qr" ? 1 : 0.95,
+    }}
+    transition={{
+      duration: 0.3,
+      ease: "easeOut",
+    }}
+  />
+  <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
+    <QrCode className="w-4 h-4" />
+    <span className="text-sm font-medium">QR Code</span>
+  </div>
+</TabsTrigger> */}
+              <TabsTrigger
+                value="settings"
+                className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
+              >
+                <motion.div
+                  className="absolute inset-2 bg-gradient-to-r from-gray-500/25 to-blue-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{
+                    opacity: activeTab === "settings" ? 1 : 0,
+                    scale: activeTab === "settings" ? 1 : 0.95,
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: "easeOut",
+                  }}
+                />
+                <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    Impostazioni
+                  </span>
+                </div>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <AnimatePresence mode="wait">
+            {/* Transfer Tab */}
+            {activeTab === "transfer" && (
+              <TabsContent
+                value="transfer"
+                className="space-y-6"
+              >
+                <motion.div
+                  key="transfer-content"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{
+                    duration: 0.4,
+                    ease: "easeInOut",
+                  }}
+                  className="grid lg:grid-cols-3 gap-6 relative z-30"
+                >
+                  {/* Main Transfer Area */}
+                  <div className="lg:col-span-2 space-y-6 relative z-30">
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1, duration: 0.3 }}
+                    >
+                      <h2 className="text-xl mb-2">
+                        Trasferimento File
+                      </h2>
+                      <p className="text-muted-foreground">
+                        Seleziona un dispositivo e trasferisci i
+                        tuoi file in modo sicuro
+                      </p>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2, duration: 0.3 }}
+                    >
+                      <FileTransfer
+                        selectedDevices={selectedDevices}
+                      />
+                    </motion.div>
+                  </div>
+
+                  {/* Dynamic Sidebar */}
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3, duration: 0.3 }}
+                    className="space-y-4 relative z-30"
+                  >
+                    <DynamicSidebar
+                      selectedDevices={selectedDevices}
+                      networkSpeed={networkSpeed}
+                      context="transfer"
+                    />
+                  </motion.div>
+                </motion.div>
+              </TabsContent>
+            )}
+
+            {/* Devices Tab */}
+            {activeTab === "devices" && (
+              <TabsContent
+                value="devices"
+                className="space-y-6"
+              >
+                <motion.div
+                  key="devices-content"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{
+                    duration: 0.4,
+                    ease: "easeInOut",
+                  }}
+                  className="grid lg:grid-cols-3 gap-6 relative z-30"
+                >
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1, duration: 0.3 }}
+                    className="lg:col-span-2 relative z-30"
+                  >
+                    <DeviceDetection
+                      onDeviceSelect={setSelectedDevices}
+                      selectedDevices={selectedDevices}
+                    />
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2, duration: 0.3 }}
+                    className="space-y-4 relative z-30"
+                  >
+                    <DynamicSidebar
+                      selectedDevices={selectedDevices}
+                      networkSpeed={networkSpeed}
+                      context="devices"
+                    />
+                  </motion.div>
+                </motion.div>
+              </TabsContent>
+            )}
+
+            {/* History Tab */}
+            {activeTab === "history" && (
+              <TabsContent
+                value="history"
+                className="space-y-6"
+              >
+                <motion.div
+                  key="history-content"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{
+                    duration: 0.4,
+                    ease: "easeInOut",
+                  }}
+                  className="grid lg:grid-cols-3 gap-6 relative z-30"
+                >
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1, duration: 0.3 }}
+                    className="lg:col-span-2 relative z-30"
+                  >
+                    <TransferHistory />
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2, duration: 0.3 }}
+                    className="space-y-4 relative z-30"
+                  >
+                    <DynamicSidebar
+                      selectedDevices={selectedDevices}
+                      networkSpeed={networkSpeed}
+                      context="history"
+                    />
+                  </motion.div>
+                </motion.div>
+              </TabsContent>
+            )}
+
+            {/* Settings Tab */}
+            {activeTab === "settings" && (
+              <TabsContent
+                value="settings"
+                className="space-y-6"
+              >
+                <motion.div
+                  key="settings-content"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{
+                    duration: 0.4,
+                    ease: "easeInOut",
+                  }}
+                  className="grid lg:grid-cols-3 gap-6 relative z-30"
+                >
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1, duration: 0.3 }}
+                    className="lg:col-span-2 relative z-30"
+                  >
+                    <SettingsComponent />
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2, duration: 0.3 }}
+                    className="space-y-4 relative z-30"
+                  >
+                    <DynamicSidebar
+                      selectedDevices={selectedDevices}
+                      networkSpeed={networkSpeed}
+                      context="settings"
+                    />
+                  </motion.div>
+                </motion.div>
+              </TabsContent>
+            )}
+          </AnimatePresence>
+        </Tabs>
+      </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }

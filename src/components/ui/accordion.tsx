@@ -23,7 +23,7 @@ function AccordionItem({
       {...props}
     />
   );
-}  
+}
 
 function AccordionTrigger({
   className,
