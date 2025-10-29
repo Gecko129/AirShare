@@ -182,7 +182,7 @@ pub async fn add_recent_transfer(
     file_name: String,
     file_size: u64,
     transfer_type: TransferType,
-    target_ip: String,
+    _target_ip: String,
     target_name: String,
     elapsed_ms: u128,
     status: TransferStatus,

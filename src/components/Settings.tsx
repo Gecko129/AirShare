@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Globe, Monitor, Smartphone, Wifi, Shield, Info, Moon, Sun, Palette } from 'lucide-react';
+import { Settings as SettingsIcon, Globe, Monitor, Shield, Info, Moon, Sun, Palette } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
@@ -14,16 +14,14 @@ const languages = [
   { code: 'es', name: 'Español', flag: '🇪🇸' },
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
   { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-  { code: 'pt', name: 'Português', flag: '🇵🇹' },
   { code: 'zh', name: '中文', flag: '🇨🇳' },
-  { code: 'ja', name: '日本語', flag: '🇯🇵' },
 ];
 
 export function Settings() {
-  const { theme, setTheme, glassStyle, setGlassStyle } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [selectedLanguage, setSelectedLanguage] = useState('it');
-  const [autoDiscovery, setAutoDiscovery] = useState(true);
-  const [encryptionEnabled, setEncryptionEnabled] = useState(true);
+  const [] = useState(true);
+  const [] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [autoAccept, setAutoAccept] = useState(false);
 
@@ -66,29 +64,6 @@ export function Settings() {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="glass-style-select">Stile Vetro</Label>
-              <Select value={glassStyle} onValueChange={setGlassStyle}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="liquid">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 opacity-60" />
-                      <span>Liquid Glass</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="opaque">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-muted border" />
-                      <span>Opaco</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </div>
       </GlassCard>
@@ -118,46 +93,6 @@ export function Settings() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        </div>
-      </GlassCard>
-
-      {/* Network Settings */}
-      <GlassCard className="p-6">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Wifi className="w-4 h-4" />
-            <h3>Rete</h3>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label>Rilevamento automatico dispositivi</Label>
-                <p className="text-sm text-muted-foreground">
-                  Cerca automaticamente dispositivi AirShare sulla rete
-                </p>
-              </div>
-              <Switch
-                checked={autoDiscovery}
-                onCheckedChange={setAutoDiscovery}
-              />
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label>Crittografia end-to-end</Label>
-                <p className="text-sm text-muted-foreground">
-                  Proteggi i trasferimenti con crittografia AES-256
-                </p>
-              </div>
-              <Switch
-                checked={encryptionEnabled}
-                onCheckedChange={setEncryptionEnabled}
-              />
-            </div>
           </div>
         </div>
       </GlassCard>
@@ -216,10 +151,6 @@ export function Settings() {
               Gestisci dispositivi fidati
             </Button>
             
-            <Button variant="outline" className="w-full justify-start">
-              <Monitor className="w-4 h-4 mr-2" />
-              Cronologia trasferimenti
-            </Button>
           </div>
         </div>
       </GlassCard>
@@ -240,10 +171,6 @@ export function Settings() {
             <div className="flex justify-between">
               <span>Build</span>
               <span>2024.01.15</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Protocollo</span>
-              <span>AirShare v3</span>
             </div>
           </div>
           
