@@ -472,7 +472,7 @@ jobs:
   create-release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: false
     
     steps:
       - name: Download all artifacts
