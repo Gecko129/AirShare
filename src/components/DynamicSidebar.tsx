@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { GlassCard } from './GlassCard';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
@@ -18,6 +18,8 @@ import {
   Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 interface DynamicSidebarProps {
   selectedDevices: any[];
@@ -43,6 +45,72 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
   const [currentStatsIndex, setCurrentStatsIndex] = useState(0);
   const [cpuUsage] = useState(Math.floor(Math.random() * 40) + 20);
   const [memoryUsage] = useState(Math.floor(Math.random() * 30) + 40);
+  const [avgSpeedToday, setAvgSpeedToday] = useState<number>(0);
+  const [transfersTodayCount, setTransfersTodayCount] = useState<number>(0);
+
+  type BackendTransferRecord = {
+    id: string;
+    fileName: string;
+    fileSize: number;
+    transferType: 'sent' | 'received';
+    status: 'completed' | 'cancelled' | 'failed';
+    fromDevice: string;
+    toDevice: string;
+    startTime: string;
+    duration: number;
+    speed: number;
+    deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+  };
+
+  const selectedDeviceKeys = useMemo(() => {
+    const names = new Set<string>();
+    const ips = new Set<string>();
+    (selectedDevices || []).forEach(d => {
+      if (d?.name) names.add(String(d.name));
+      if (d?.ip || d?.ipAddress) ips.add(String(d.ip || d.ipAddress));
+    });
+    return { names, ips };
+  }, [selectedDevices]);
+
+  const isToday = (date: Date) => {
+    const now = new Date();
+    return (
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate()
+    );
+  };
+
+  const computeTodayStats = (records: BackendTransferRecord[]) => {
+    const relevant = records.filter(r => {
+      const dt = new Date(r.startTime);
+      if (!isToday(dt)) return false;
+      const involvesSelected =
+        selectedDeviceKeys.names.has(r.fromDevice) ||
+        selectedDeviceKeys.names.has(r.toDevice) ||
+        selectedDeviceKeys.ips.has(r.fromDevice) ||
+        selectedDeviceKeys.ips.has(r.toDevice);
+      return involvesSelected;
+    });
+
+    const completed = relevant.filter(r => r.status === 'completed');
+    const count = completed.length;
+    const avg = count > 0
+      ? completed.reduce((acc, r) => acc + (typeof r.speed === 'number' ? r.speed : 0), 0) / count
+      : 0;
+
+    setTransfersTodayCount(count);
+    setAvgSpeedToday(avg);
+  };
+
+  const loadRecentTransfers = async () => {
+    try {
+      const data = await invoke<BackendTransferRecord[]>('get_recent_transfers');
+      computeTodayStats(data);
+    } catch (e) {
+      // fail-silent
+    }
+  };
 
   const getTips = (): TipContent[] => {
     const baseTips: TipContent[] = [
@@ -128,18 +196,24 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
   };
 
   const getStats = (): StatsContent[] => {
+    const speedTrend: 'up' | 'down' | 'stable' =
+      avgSpeedToday === 0 && networkSpeed === 0
+        ? 'stable'
+        : avgSpeedToday >= networkSpeed
+        ? 'up'
+        : 'down';
     return [
       {
         icon: <Activity className="w-4 h-4" />,
         title: "Trasferimenti",
-        value: "47",
+        value: String(transfersTodayCount),
         trend: 'stable'
       },
       {
         icon: <TrendingUp className="w-4 h-4" />,
         title: "Velocità Media",
-        value: `${networkSpeed} MB/s`,
-        trend: 'up'
+        value: `${avgSpeedToday.toFixed(1)} MB/s`,
+        trend: speedTrend
       },
       {
         icon: <Cpu className="w-4 h-4" />,
@@ -174,6 +248,22 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
     }, 4000);
     return () => clearInterval(interval);
   }, [stats.length]);
+
+  // Carica dati e aggiorna su eventi di completamento; ricalcola quando cambia la selezione
+  useEffect(() => {
+    loadRecentTransfers();
+    let unlisten: undefined | (() => void);
+    (async () => {
+      try {
+        unlisten = await listen('transfer_complete', () => {
+          loadRecentTransfers();
+        });
+      } catch {}
+    })();
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [selectedDeviceKeys.names, selectedDeviceKeys.ips]);
 
   const getTrendColor = (trend?: 'up' | 'down' | 'stable') => {
     switch (trend) {

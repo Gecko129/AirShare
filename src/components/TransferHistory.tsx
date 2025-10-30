@@ -360,10 +360,10 @@ export function TransferHistory() {
                     </>
                   )}
                   {transfer.status === 'failed' && (
-                    <div className="text-red-500">Trasferimento fallito</div>
+                    <div className="text-red-500">Fallito</div>
                   )}
                   {transfer.status === 'cancelled' && (
-                    <div className="text-yellow-500">Annullato dall'utente</div>
+                    <div className="text-yellow-500">Annullato</div>
                   )}
                 </div>
 

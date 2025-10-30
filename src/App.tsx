@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Tabs,
   TabsContent,
@@ -21,13 +21,35 @@ import { motion, AnimatePresence } from "motion/react";
 import { DynamicSidebar } from "./components/DynamicSidebar";
 import { TransferHistory } from "./components/TransferHistory";
 import { CanvasBackground } from "./components/CanvasBackground";
+import PrivacyPolicy from "./components/PrivacyPolicy";
+import TermsOfService from "./components/TermsOfService";
 
 function AppContent() {
   const [selectedDevices, setSelectedDevices] = useState<any[]>(
     [],
   );
   const [activeTab, setActiveTab] = useState("transfer");
-  const [networkSpeed, setNetworkSpeed] = useState(100); // MB/s
+  const [networkSpeed] = useState(100); // MB/s
+  const [route, setRoute] = useState<string>(window.location.hash || "");
+
+  useEffect(() => {
+    const onHashChange = () => setRoute(window.location.hash || "");
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  const isPrivacy = route === "#/privacy";
+  const isTerms = route === "#/terms";
+
+  // Sincronizza tab attiva con hash specifici quando siamo nella vista principale
+  useEffect(() => {
+    if (!isPrivacy && !isTerms) {
+      if (route === "#/transfer") setActiveTab("transfer");
+      if (route === "#/devices") setActiveTab("devices");
+      if (route === "#/history") setActiveTab("history");
+      if (route === "#/settings") setActiveTab("settings");
+    }
+  }, [route, isPrivacy, isTerms]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 relative overflow-hidden">
@@ -81,7 +103,33 @@ function AppContent() {
         <div className="absolute inset-0 pointer-events-none">
           <CanvasBackground />
         </div>
-
+        {isPrivacy ? (
+          <div className="grid lg:grid-cols-3 gap-6 relative z-30">
+            <div className="lg:col-span-2 relative z-30">
+              <PrivacyPolicy />
+            </div>
+            <div className="space-y-4 relative z-30">
+              <DynamicSidebar
+                selectedDevices={selectedDevices}
+                networkSpeed={networkSpeed}
+                context="settings"
+              />
+            </div>
+          </div>
+        ) : isTerms ? (
+          <div className="grid lg:grid-cols-3 gap-6 relative z-30">
+            <div className="lg:col-span-2 relative z-30">
+              <TermsOfService />
+            </div>
+            <div className="space-y-4 relative z-30">
+              <DynamicSidebar
+                selectedDevices={selectedDevices}
+                networkSpeed={networkSpeed}
+                context="settings"
+              />
+            </div>
+          </div>
+        ) : (
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -398,6 +446,7 @@ function AppContent() {
             )}
           </AnimatePresence>
         </Tabs>
+        )}
       </main>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Settings as SettingsIcon, Globe, Monitor, Shield, Info, Moon, Sun, Palette } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -7,15 +7,30 @@ import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
 import { useTheme } from './ThemeProvider';
+import { getVersion } from '@tauri-apps/api/app';
 
-const languages = [
-  { code: 'it', name: 'Italiano', flag: '🇮🇹' },
-  { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'es', name: 'Español', flag: '🇪🇸' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
-  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-  { code: 'zh', name: '中文', flag: '🇨🇳' },
+import itFlag from "../assets/it.jpg";
+import enFlag from "../assets/en.jpg";
+import esFlag from "../assets/es.jpg";
+import frFlag from "../assets/fr.jpg";
+import deFlag from "../assets/de.jpg";
+import zhFlag from "../assets/zh.jpg";
+
+type Language = {
+  code: string;
+  name: string;
+  flagSrc: string;
+};
+
+const languages: Language[] = [
+  { code: "it", name: "Italiano", flagSrc: itFlag },
+  { code: "en", name: "English", flagSrc: enFlag },
+  { code: "es", name: "Español", flagSrc: esFlag },
+  { code: "fr", name: "Français", flagSrc: frFlag },
+  { code: "de", name: "Deutsch", flagSrc: deFlag },
+  { code: "zh", name: "中文", flagSrc: zhFlag },
 ];
+
 
 export function Settings() {
   const { theme, setTheme } = useTheme();
@@ -24,6 +39,18 @@ export function Settings() {
   const [] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [autoAccept, setAutoAccept] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const v = await getVersion();
+        setAppVersion(v);
+      } catch (e) {
+        // fallback silenzioso
+      }
+    })();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -86,7 +113,7 @@ export function Settings() {
                 {languages.map((lang) => (
                   <SelectItem key={lang.code} value={lang.code}>
                     <div className="flex items-center gap-2">
-                      <span>{lang.flag}</span>
+                      <img src={lang.flagSrc} alt={lang.name} className="h-4 w-auto max-w-[24px] rounded-[2px] object-contain bg-slate-700/40" />
                       <span>{lang.name}</span>
                     </div>
                   </SelectItem>
@@ -166,7 +193,7 @@ export function Settings() {
           <div className="space-y-3 text-sm text-muted-foreground">
             <div className="flex justify-between">
               <span>Versione</span>
-              <span>2.1.0</span>
+              <span>{appVersion || '-'}</span>
             </div>
             <div className="flex justify-between">
               <span>Build</span>
@@ -177,14 +204,11 @@ export function Settings() {
           <Separator />
           
           <div className="space-y-2">
-            <Button variant="ghost" className="w-full justify-start p-0 h-auto">
+            <Button variant="ghost" className="w-full justify-start p-0 h-auto" onClick={() => { window.location.hash = '#/privacy'; }}>
               Privacy Policy
             </Button>
-            <Button variant="ghost" className="w-full justify-start p-0 h-auto">
+            <Button variant="ghost" className="w-full justify-start p-0 h-auto" onClick={() => { window.location.hash = '#/terms'; }}>
               Termini di Servizio
-            </Button>
-            <Button variant="ghost" className="w-full justify-start p-0 h-auto">
-              Supporto
             </Button>
           </div>
         </div>
