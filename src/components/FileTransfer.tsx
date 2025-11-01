@@ -506,23 +506,23 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
   const canSend = selectedFiles.length > 0 && selectedDevices.length > 0 && !isUploading;
 
   return (
-    <Card className="backdrop-blur-md bg-gray-900/40 border border-gray-700/50 shadow-2xl p-6">
+    <Card className="backdrop-blur-md bg-white/70 border border-slate-200 shadow-xl p-6">
       <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-full bg-gradient-to-r from-gray-700/40 to-slate-600/40 backdrop-blur-sm">
-          <Upload className="w-6 h-6 text-gray-200" />
+        <div className="p-2 rounded-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 backdrop-blur-sm">
+          <Upload className="w-6 h-6 text-slate-700" />
         </div>
         <div>
-          <h2 className="text-gray-100">{t("file_transfer_title")}</h2>
-          <p className="text-gray-400 text-sm">{t("file_transfer_description")}</p>
+          <h2 className="text-slate-900">{t("file_transfer_title")}</h2>
+          <p className="text-slate-600 text-sm">{t("file_transfer_description")}</p>
         </div>
       </div>
 
       {/* Dispositivi di destinazione */}
       {selectedDevices.length > 0 && (
-        <div className="mb-6 p-4 rounded-lg bg-slate-800/30 border border-slate-700/40">
+        <div className="mb-6 p-4 rounded-lg bg-slate-50 border border-slate-200">
           <div className="flex items-center gap-2 mb-3">
-            <Users className="w-4 h-4 text-slate-300" />
-            <span className="text-slate-200 text-sm">
+            <Users className="w-4 h-4 text-slate-700" />
+            <span className="text-slate-800 text-sm">
               {t("sending_to_devices", { count: selectedDevices.length })}
             </span>
           </div>
@@ -554,28 +554,28 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
               return (
                 <div key={deviceId} className="text-sm space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-300">{`${name} (${ip})`}</span>
+                    <span className="text-slate-800">{`${name} (${ip})`}</span>
                     {isUploading && generalProgress[key] !== undefined && (
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-20 h-1 bg-gray-700/60 rounded-full overflow-hidden">
+                          <div className="w-20 h-1 bg-slate-200 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-slate-400 transition-all duration-300"
+                              className="h-full bg-slate-600 transition-all duration-300"
                               style={{ width: `${generalProgress[key].percent}%` }}
                             />
                           </div>
-                          <span className="text-gray-400 text-xs w-8">{generalProgress[key].percent}%</span>
+                          <span className="text-slate-600 text-xs w-8">{generalProgress[key].percent}%</span>
                         </div>
                         {generalProgress[key].eta && generalProgress[key].eta !== t("calculating_eta") && (
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/40 border border-slate-600/40">
-                            <span className="text-slate-300 text-xs">⏱️</span>
-                            <span className="text-slate-200 text-xs">{generalProgress[key].eta}</span>
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 border border-slate-200">
+                            <span className="text-slate-700 text-xs">⏱️</span>
+                            <span className="text-slate-700 text-xs">{generalProgress[key].eta}</span>
                           </div>
                         )}
                         {generalProgress[key].eta === t("calculating_eta") && (
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-600/40 border border-slate-500/40">
-                            <span className="text-slate-400 text-xs">⏳</span>
-                            <span className="text-slate-300 text-xs">{t("calculating_eta")}</span>
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 border border-slate-200">
+                            <span className="text-slate-600 text-xs">⏳</span>
+                            <span className="text-slate-700 text-xs">{t("calculating_eta")}</span>
                           </div>
                         )}
                       </div>
@@ -591,7 +591,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                         </span>
                         {generalProgress[key].currentFile && (
                           <span className="text-gray-500 text-xs truncate max-w-xs">
-                            In corso: {generalProgress[key].currentFile}
+                            {t('in_progress')}: {generalProgress[key].currentFile}
                           </span>
                         )}
                       </div>
@@ -612,8 +612,8 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         onClick={handleFileDialog}
         className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${
           isDragging
-            ? 'border-slate-500/60 bg-slate-700/20'
-            : 'border-gray-600/50 hover:border-gray-500/70 hover:bg-gray-800/20'
+            ? 'border-blue-400 bg-blue-50'
+            : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
         }`}
       >
         <AnimatePresence mode="wait">
@@ -625,12 +625,12 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
-              <div className="p-4 rounded-full bg-gray-800/40 w-fit mx-auto">
-                <Upload className="w-8 h-8 text-gray-400" />
+              <div className="p-4 rounded-full bg-slate-100 w-fit mx-auto">
+                <Upload className="w-8 h-8 text-slate-600" />
               </div>
               <div>
-                <p className="text-gray-200">{t("drop_file_text")}</p>
-                <p className="text-gray-500 text-sm mt-1">{t("drop_file_subtext")}</p>
+                <p className="text-slate-800">{t("drop_file_text")}</p>
+                <p className="text-slate-600 text-sm mt-1">{t("drop_file_subtext")}</p>
               </div>
             </motion.div>
           ) : (
@@ -643,12 +643,12 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
             >
               <div className="space-y-2">
                 {selectedFiles.map((f, idx) => (
-                  <div key={`${f.name}-${idx}`} className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40">
+                  <div key={`${f.name}-${idx}`} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
                     <div className="flex items-center gap-3">
-                      <File className="w-6 h-6 text-slate-300" />
+                      <File className="w-6 h-6 text-slate-700" />
                       <div className="text-left">
-                        <p className="text-gray-200 truncate max-w-xs">{f.name}</p>
-                        <p className="text-gray-400 text-sm">{formatFileSize(f.size)}</p>
+                        <p className="text-slate-800 truncate max-w-xs">{f.name}</p>
+                        <p className="text-slate-600 text-sm">{formatFileSize(f.size)}</p>
                       </div>
                     </div>
                     <Button
@@ -658,7 +658,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                       }}
                       variant="ghost"
                       size="sm"
-                      className="text-gray-400 hover:text-gray-200 hover:bg-gray-700/60"
+                      className="text-slate-600 hover:text-slate-800 hover:bg-slate-100"
                       type="button"
                     >
                       <X className="w-4 h-4" />
@@ -670,7 +670,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
                     onClick={(e: React.MouseEvent) => { e.stopPropagation(); removeFile(); }}
                     variant="ghost"
                     size="sm"
-                    className="text-gray-300 hover:text-gray-100 hover:bg-gray-700/60"
+                    className="text-slate-700 hover:text-slate-900 hover:bg-slate-100"
                     type="button"
                   >
                     {t("remove_everything")}
@@ -684,9 +684,9 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
 
       {/* Warning per nessun dispositivo selezionato */}
       {selectedFiles.length > 0 && selectedDevices.length === 0 && (
-        <div className="mt-4 p-3 rounded-lg bg-orange-900/40 border border-orange-700/40 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-orange-400" />
-          <span className="text-orange-300 text-sm">{t("no_device_selected")}</span>
+        <div className="mt-4 p-3 rounded-lg bg-orange-50 border border-orange-200 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-orange-600" />
+          <span className="text-orange-700 text-sm">{t("no_device_selected")}</span>
         </div>
       )}
 
@@ -695,7 +695,7 @@ export function FileTransfer({ selectedDevices, onDevicesUpdate }: FileTransferP
         <Button
           onClick={handleSend}
           disabled={!canSend}
-          className="bg-gradient-to-r from-slate-600 to-gray-700 hover:from-slate-500 hover:to-gray-600 text-gray-100 border-0 shadow-lg backdrop-blur-sm disabled:opacity-50"
+          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-0 shadow-lg backdrop-blur-sm disabled:opacity-50"
           type="button"
         >
           <AnimatePresence mode="wait">

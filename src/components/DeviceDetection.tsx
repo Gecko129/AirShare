@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Wifi, RefreshCw, Search, X } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 import { Button } from './ui/button';
@@ -33,6 +34,7 @@ const isDeviceOnline = (lastSeen?: string | number): boolean => {
 };
 
 export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetectionProps) {
+  const { t } = useTranslation();
   const [devices, setDevices] = useState<SharedDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -119,7 +121,7 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
             <Wifi className="w-5 h-5" />
           </motion.div>
           <div>
-            <h2>Dispositivi Disponibili</h2>
+            <h2>{t('devices.available_title')}</h2>
             <AnimatePresence>
               {selectedDevices.length > 0 && (
                 <motion.p 
@@ -128,7 +130,7 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
                   exit={{ opacity: 0, height: 0 }}
                   className="text-sm text-primary mt-1"
                 >
-                  {selectedDevices.length} dispositivo{selectedDevices.length > 1 ? 'i' : ''} selezionato{selectedDevices.length > 1 ? 'i' : ''}
+                  {t('devices.selected_count', { count: selectedDevices.length })}
                 </motion.p>
               )}
             </AnimatePresence>
@@ -151,7 +153,7 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
                   className="gap-2"
                 >
                   <X className="w-4 h-4" />
-                  Deseleziona Tutti
+                  {t('devices.deselect_all')}
                 </Button>
               </motion.div>
             )}
@@ -171,7 +173,7 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
               ) : (
                 <RefreshCw className="w-4 h-4 mr-2" />
               )}
-              {isScanning ? 'Ricerca...' : 'Aggiorna'}
+              {isScanning ? t('devices.searching') : t('devices.refresh')}
             </Button>
           </motion.div>
         </div>
@@ -181,7 +183,7 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Cerca dispositivi..."
+          placeholder={t('devices.search_placeholder')}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
@@ -192,10 +194,8 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
       {isScanning && devices.length === 0 && (
         <GlassCard className="p-8 text-center">
           <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin text-muted-foreground" />
-          <h3>Ricerca dispositivi in corso...</h3>
-          <p className="text-muted-foreground text-sm mt-1">
-            Scansione della rete locale per dispositivi AirShare
-          </p>
+          <h3>{t('devices.searching_title')}</h3>
+          <p className="text-muted-foreground text-sm mt-1">{t('devices.searching_subtitle')}</p>
         </GlassCard>
       )}
 
@@ -208,9 +208,7 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
           >
-            <h3 className="mb-3 text-green-600">
-              Online ({onlineDevices.length})
-            </h3>
+            <h3 className="mb-3 text-green-600">{t('devices.online', { count: onlineDevices.length })}</h3>
             <div className="grid gap-3">
               {onlineDevices.map((device, index) => (
                 <motion.div
@@ -240,9 +238,7 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            <h3 className="mb-3 text-muted-foreground">
-              Offline ({offlineDevices.length})
-            </h3>
+            <h3 className="mb-3 text-muted-foreground">{t('devices.offline', { count: offlineDevices.length })}</h3>
             <div className="grid gap-3">
               {offlineDevices.map((device, index) => (
                 <motion.div
@@ -267,10 +263,8 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
       {!isScanning && devices.length === 0 && (
         <GlassCard className="p-8 text-center">
           <Wifi className="w-8 h-8 mx-auto mb-4 text-muted-foreground" />
-          <h3>Nessun dispositivo trovato</h3>
-          <p className="text-muted-foreground text-sm mt-1">
-            Assicurati che i dispositivi siano sulla stessa rete e abbiano AirShare installato
-          </p>
+          <h3>{t('devices.empty_title')}</h3>
+          <p className="text-muted-foreground text-sm mt-1">{t('devices.empty_subtitle')}</p>
         </GlassCard>
       )}
 
@@ -278,10 +272,8 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
       {!isScanning && devices.length > 0 && filteredDevices.length === 0 && (
         <GlassCard className="p-8 text-center">
           <Search className="w-8 h-8 mx-auto mb-4 text-muted-foreground" />
-          <h3>Nessun risultato trovato</h3>
-          <p className="text-muted-foreground text-sm mt-1">
-            Prova a modificare i termini di ricerca
-          </p>
+          <h3>{t('devices.no_results_title')}</h3>
+          <p className="text-muted-foreground text-sm mt-1">{t('devices.no_results_subtitle')}</p>
         </GlassCard>
       )}
     </div>

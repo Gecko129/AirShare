@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassCard } from './GlassCard';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -51,6 +52,7 @@ interface BackendTransferRecord {
 }
 
 export function TransferHistory() {
+  const { t } = useTranslation();
   const [transfers, setTransfers] = useState<TransferRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -124,9 +126,9 @@ export function TransferHistory() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffDays > 0) return `${diffDays} giorni fa`;
-    if (diffHours > 0) return `${diffHours} ore fa`;
-    return 'Poco fa';
+    if (diffDays > 0) return t('history.days_ago', { count: diffDays });
+    if (diffHours > 0) return t('history.hours_ago', { count: diffHours });
+    return t('history.just_now');
   };
 
   const getStatusIcon = (status: TransferRecord['status']) => {
@@ -143,11 +145,11 @@ export function TransferHistory() {
   const getStatusBadge = (status: TransferRecord['status']) => {
     switch (status) {
       case 'completed':
-        return <Badge variant="outline" className="text-green-600 border-green-200">Completato</Badge>;
+        return <Badge variant="outline" className="text-green-600 border-green-200">{t('history.status.completed')}</Badge>;
       case 'failed':
-        return <Badge variant="outline" className="text-red-600 border-red-200">Fallito</Badge>;
+        return <Badge variant="outline" className="text-red-600 border-red-200">{t('history.status.failed')}</Badge>;
       case 'cancelled':
-        return <Badge variant="outline" className="text-yellow-600 border-yellow-200">Annullato</Badge>;
+        return <Badge variant="outline" className="text-yellow-600 border-yellow-200">{t('history.status.cancelled')}</Badge>;
     }
   };
 
@@ -219,24 +221,22 @@ export function TransferHistory() {
       >
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-xl mb-2">Cronologia Trasferimenti</h2>
-            <p className="text-muted-foreground">
-              Visualizza e gestisci tutti i tuoi trasferimenti file
-            </p>
+            <h2 className="text-xl mb-2">{t('history.title')}</h2>
+            <p className="text-muted-foreground">{t('history.subtitle')}</p>
           </div>
           
           <div className="flex gap-4">
             <div className="text-center">
               <div className="font-semibold">{totalTransfers}</div>
-              <div className="text-sm text-muted-foreground">Totali</div>
+              <div className="text-sm text-muted-foreground">{t('history.stats.total')}</div>
             </div>
             <div className="text-center">
               <div className="font-semibold">{completedTransfers}</div>
-              <div className="text-sm text-muted-foreground">Completati</div>
+              <div className="text-sm text-muted-foreground">{t('history.stats.completed')}</div>
             </div>
             <div className="text-center">
               <div className="font-semibold">{formatFileSize(totalDataTransferred)}</div>
-              <div className="text-sm text-muted-foreground">Trasferiti</div>
+              <div className="text-sm text-muted-foreground">{t('history.stats.transferred')}</div>
             </div>
           </div>
         </div>
@@ -249,7 +249,7 @@ export function TransferHistory() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Cerca file, dispositivi..."
+                placeholder={t('history.search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -263,9 +263,9 @@ export function TransferHistory() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tutti</SelectItem>
-                <SelectItem value="sent">Inviati</SelectItem>
-                <SelectItem value="received">Ricevuti</SelectItem>
+                <SelectItem value="all">{t('history.filters.all')}</SelectItem>
+                <SelectItem value="sent">{t('history.filters.sent')}</SelectItem>
+                <SelectItem value="received">{t('history.filters.received')}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -274,10 +274,10 @@ export function TransferHistory() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tutti Stati</SelectItem>
-                <SelectItem value="completed">Completati</SelectItem>
-                <SelectItem value="failed">Falliti</SelectItem>
-                <SelectItem value="cancelled">Annullati</SelectItem>
+                <SelectItem value="all">{t('history.filters.all_status')}</SelectItem>
+                <SelectItem value="completed">{t('history.status.completed')}</SelectItem>
+                <SelectItem value="failed">{t('history.status.failed')}</SelectItem>
+                <SelectItem value="cancelled">{t('history.status.cancelled')}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -287,9 +287,9 @@ export function TransferHistory() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="date">Data</SelectItem>
-                <SelectItem value="size">Dimensione</SelectItem>
-                <SelectItem value="speed">Velocità</SelectItem>
+                <SelectItem value="date">{t('history.sort.date')}</SelectItem>
+                <SelectItem value="size">{t('history.sort.size')}</SelectItem>
+                <SelectItem value="speed">{t('history.sort.speed')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -302,13 +302,13 @@ export function TransferHistory() {
           {isLoading ? (
             <div className="text-center py-12 text-muted-foreground">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p>Caricamento trasferimenti...</p>
+              <p>{t('history.loading')}</p>
             </div>
           ) : filteredTransfers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <File className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Nessun trasferimento trovato</p>
-              <p className="text-sm">Prova a modificare i filtri di ricerca</p>
+              <p>{t('history.empty.title')}</p>
+              <p className="text-sm">{t('history.empty.subtitle')}</p>
             </div>
           ) : (
             filteredTransfers.map((transfer, index) => (
@@ -360,10 +360,10 @@ export function TransferHistory() {
                     </>
                   )}
                   {transfer.status === 'failed' && (
-                    <div className="text-red-500">Fallito</div>
+                    <div className="text-red-500">{t('history.status.failed')}</div>
                   )}
                   {transfer.status === 'cancelled' && (
-                    <div className="text-yellow-500">Annullato</div>
+                    <div className="text-yellow-500">{t('history.status.cancelled')}</div>
                   )}
                 </div>
 
@@ -386,20 +386,20 @@ export function TransferHistory() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+            <AlertDialogTitle>{t('history.delete.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Sei sicuro di voler eliminare questo trasferimento? Questa azione non può essere annullata.
+              {t('history.delete.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleDeleteCancel} className="bg-gray-500 text-white hover:bg-gray-600">
-              Annulla
+              {t('common.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               className="bg-red-600 text-white hover:bg-red-700"
             >
-              Conferma
+              {t('common.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

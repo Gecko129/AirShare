@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassCard } from './GlassCard';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
@@ -24,6 +25,7 @@ import { listen } from '@tauri-apps/api/event';
 interface DynamicSidebarProps {
   selectedDevices: any[];
   networkSpeed: number;
+  avgSpeedToday?: number;
   context: 'transfer' | 'devices' | 'history' | 'qr' | 'settings';
 }
 
@@ -41,6 +43,7 @@ interface StatsContent {
 }
 
 export function DynamicSidebar({ selectedDevices, networkSpeed, context }: DynamicSidebarProps) {
+  const { t } = useTranslation();
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [currentStatsIndex, setCurrentStatsIndex] = useState(0);
   const [cpuUsage] = useState(Math.floor(Math.random() * 40) + 20);
@@ -116,29 +119,29 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
     const baseTips: TipContent[] = [
       {
         icon: <Zap className="w-4 h-4" />,
-        title: "Ottimizzazione",
+        title: t('sidebar.tips.optimization.title'),
         content: [
-          "Chiudi app non necessarie",
-          "Usa cavo Ethernet",
-          "Comprimi file grandi"
+          t('sidebar.tips.optimization.item1'),
+          t('sidebar.tips.optimization.item2'),
+          t('sidebar.tips.optimization.item3')
         ]
       },
       {
         icon: <Shield className="w-4 h-4" />,
-        title: "Sicurezza",
+        title: t('sidebar.tips.security.title'),
         content: [
-          "Crittografia AES-256",
-          "Peer-to-peer sicuro",
-          "Nessun server esterno"
+          t('sidebar.tips.security.item1'),
+          t('sidebar.tips.security.item2'),
+          t('sidebar.tips.security.item3')
         ]
       },
       {
         icon: <Clock className="w-4 h-4" />,
-        title: "Velocità",
+        title: t('sidebar.tips.speed.title'),
         content: [
-          "WiFi 5GHz consigliato",
-          "Connessione stabile richiesta",
-          "Monitora la rete"
+          t('sidebar.tips.speed.item1'),
+          t('sidebar.tips.speed.item2'),
+          t('sidebar.tips.speed.item3')
         ]
       }
     ];
@@ -146,47 +149,47 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
     const contextSpecificTips: Record<string, TipContent> = {
       transfer: {
         icon: <Share2 className="w-4 h-4" />,
-        title: "Trasferimento",
+        title: t('sidebar.tips.transfer.title'),
         content: [
-          "Trascina cartelle o più file",
-          "Anteprima immagini",
-          "Gestione duplicati automatica"
+          t('sidebar.tips.transfer.item1'),
+          t('sidebar.tips.transfer.item2'),
+          t('sidebar.tips.transfer.item3')
         ]
       },
       devices: {
         icon: <Wifi className="w-4 h-4" />,
-        title: "Dispositivi",
+        title: t('sidebar.tips.devices.title'),
         content: [
-          "Scansione automatica rete",
-          "Cache dispositivi affidabili",
-          "Supporto hotspot mobile"
+          t('sidebar.tips.devices.item1'),
+          t('sidebar.tips.devices.item2'),
+          t('sidebar.tips.devices.item3')
         ]
       },
       history: {
         icon: <BarChart3 className="w-4 h-4" />,
-        title: "Storico",
+        title: t('sidebar.tips.history.title'),
         content: [
-          "Statistiche per dispositivo",
-          "Analisi mensile utilizzo",
-          "Backup cronologia online"
+          t('sidebar.tips.history.item1'),
+          t('sidebar.tips.history.item2'),
+          t('sidebar.tips.history.item3')
         ]
       },
       qr: {
         icon: <Share2 className="w-4 h-4" />,
-        title: "QR",
+        title: t('sidebar.tips.qr.title'),
         content: [
-          "QR code temporanei",
-          "Inviti guest a tempo",
-          "Link monouso sicuri"
+          t('sidebar.tips.qr.item1'),
+          t('sidebar.tips.qr.item2'),
+          t('sidebar.tips.qr.item3')
         ]
       },
       settings: {
         icon: <Lightbulb className="w-4 h-4" />,
-        title: "Impostazioni",
+        title: t('sidebar.tips.settings.title'),
         content: [
-          "Diverse opzioni di lingua",
-          "Scorciatoie rapide",
-          "Notifiche smart",
+          t('sidebar.tips.settings.item1'),
+          t('sidebar.tips.settings.item2'),
+          t('sidebar.tips.settings.item3'),
         ]
       }
     };
@@ -205,25 +208,25 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
     return [
       {
         icon: <Activity className="w-4 h-4" />,
-        title: "Trasferimenti",
+        title: t('sidebar.stats.transfers'),
         value: String(transfersTodayCount),
         trend: 'stable'
       },
       {
         icon: <TrendingUp className="w-4 h-4" />,
-        title: "Velocità Media",
+        title: t('sidebar.stats.avg_speed'),
         value: `${avgSpeedToday.toFixed(1)} MB/s`,
         trend: speedTrend
       },
       {
         icon: <Cpu className="w-4 h-4" />,
-        title: "CPU Usage",
+        title: t('sidebar.stats.cpu'),
         value: `${cpuUsage}%`,
         trend: cpuUsage > 60 ? 'up' : 'stable'
       },
       {
         icon: <HardDrive className="w-4 h-4" />,
-        title: "Memory",
+        title: t('sidebar.stats.memory'),
         value: `${memoryUsage}%`,
         trend: memoryUsage > 70 ? 'up' : 'stable'
       }
@@ -277,7 +280,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
     <div className="space-y-4">
       {/* Selected Devices */}
       <GlassCard className="p-4">
-        <h3 className="mb-3">Dispositivi Selezionati</h3>
+        <h3 className="mb-3">{t('sidebar.selected_devices')}</h3> 
         {selectedDevices.length > 0 ? (
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {selectedDevices.map((device, index) => (
@@ -303,7 +306,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
                 </div>
                 <Badge variant="outline" className="text-xs">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-1" />
-                  Connesso
+                  {t('common.connected')}
                 </Badge>
               </motion.div>
             ))}
@@ -311,7 +314,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
         ) : (
           <div className="text-center py-6 text-muted-foreground">
             <Wifi className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Nessun dispositivo selezionato</p>
+            <p className="text-sm">{t('sidebar.no_selected_devices')}</p>
           </div>
         )}
       </GlassCard>
@@ -319,7 +322,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
       {/* Dynamic Stats */}
       <GlassCard className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3>Statistiche Live</h3>
+          <h3>{t('sidebar.live_stats')}</h3>
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
         </div>
         
@@ -374,7 +377,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
       {/* Dynamic Tips */}
       <GlassCard className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3>Suggerimenti Pro</h3>
+          <h3>{t('sidebar.pro_tips')}</h3>
           <motion.div
             animate={{ 
               scale: [1, 1.1, 1],

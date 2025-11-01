@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Tabs,
   TabsContent,
@@ -24,12 +25,15 @@ import { CanvasBackground } from "./components/CanvasBackground";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import TermsOfService from "./components/TermsOfService";
 
+
 function AppContent() {
+  const { t } = useTranslation();
   const [selectedDevices, setSelectedDevices] = useState<any[]>(
     [],
   );
   const [activeTab, setActiveTab] = useState("transfer");
-  const [networkSpeed] = useState(100); // MB/s
+  const [avgSpeedToday, setAvgSpeedToday] = useState<number>(0);
+  const [networkSpeed, setNetworkSpeed] = useState<number>(0);
   const [route, setRoute] = useState<string>(window.location.hash || "");
 
   useEffect(() => {
@@ -68,12 +72,8 @@ function AppContent() {
                 <Send className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold">
-                  AirShare
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Trasferimento file cross-platform
-                </p>
+                <h1 className="text-xl font-semibold">AirShare</h1>
+                <p className="text-sm text-muted-foreground">{t('app.subtitle')}</p>
               </div>
             </div>
 
@@ -83,14 +83,14 @@ function AppContent() {
                 className="gap-2 bg-background/50 dark:bg-background/30 backdrop-blur-sm"
               >
                 <Zap className="w-3 h-3 text-green-500" />
-                {networkSpeed} MB/s
+                {avgSpeedToday.toFixed(1)} {t('common.mbps')}
               </Badge>
               <Badge
                 variant="outline"
                 className="gap-1 bg-background/50 dark:bg-background/30 backdrop-blur-sm"
               >
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                Online
+                {t('common.online')}
               </Badge>
             </div>
           </div>
@@ -111,6 +111,7 @@ function AppContent() {
             <div className="space-y-4 relative z-30">
               <DynamicSidebar
                 selectedDevices={selectedDevices}
+                avgSpeedToday={avgSpeedToday}
                 networkSpeed={networkSpeed}
                 context="settings"
               />
@@ -124,6 +125,7 @@ function AppContent() {
             <div className="space-y-4 relative z-30">
               <DynamicSidebar
                 selectedDevices={selectedDevices}
+                avgSpeedToday={avgSpeedToday}
                 networkSpeed={networkSpeed}
                 context="settings"
               />
@@ -156,9 +158,7 @@ function AppContent() {
                 />
                 <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
                   <Send className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    Trasferimento
-                  </span>
+                  <span className="text-sm font-medium">{t('tabs.transfer')}</span>
                 </div>
               </TabsTrigger>
               <TabsTrigger
@@ -179,9 +179,7 @@ function AppContent() {
                 />
                 <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
                   <Wifi className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    Dispositivi
-                  </span>
+                  <span className="text-sm font-medium">{t('tabs.devices')}</span>
                 </div>
               </TabsTrigger>
               <TabsTrigger
@@ -202,9 +200,7 @@ function AppContent() {
                 />
                 <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
                   <History className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    Cronologia
-                  </span>
+                  <span className="text-sm font-medium">{t('tabs.history')}</span>
                 </div>
               </TabsTrigger>
               {/* <TabsTrigger
@@ -246,9 +242,7 @@ function AppContent() {
                 />
                 <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
                   <Settings className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    Impostazioni
-                  </span>
+                  <span className="text-sm font-medium">{t('tabs.settings')}</span>
                 </div>
               </TabsTrigger>
             </TabsList>
@@ -279,13 +273,8 @@ function AppContent() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.1, duration: 0.3 }}
                     >
-                      <h2 className="text-xl mb-2">
-                        Trasferimento File
-                      </h2>
-                      <p className="text-muted-foreground">
-                        Seleziona un dispositivo e trasferisci i
-                        tuoi file in modo sicuro
-                      </p>
+                      <h2 className="text-xl mb-2">{t('transfer.title')}</h2>
+                      <p className="text-muted-foreground">{t('transfer.subtitle')}</p>
                     </motion.div>
 
                     <motion.div
@@ -308,6 +297,7 @@ function AppContent() {
                   >
                     <DynamicSidebar
                       selectedDevices={selectedDevices}
+                      avgSpeedToday={avgSpeedToday}
                       networkSpeed={networkSpeed}
                       context="transfer"
                     />
@@ -353,6 +343,7 @@ function AppContent() {
                   >
                     <DynamicSidebar
                       selectedDevices={selectedDevices}
+                      avgSpeedToday={avgSpeedToday}
                       networkSpeed={networkSpeed}
                       context="devices"
                     />
@@ -395,6 +386,7 @@ function AppContent() {
                   >
                     <DynamicSidebar
                       selectedDevices={selectedDevices}
+                      avgSpeedToday={avgSpeedToday}
                       networkSpeed={networkSpeed}
                       context="history"
                     />
@@ -437,6 +429,7 @@ function AppContent() {
                   >
                     <DynamicSidebar
                       selectedDevices={selectedDevices}
+                      avgSpeedToday={avgSpeedToday}
                       networkSpeed={networkSpeed}
                       context="settings"
                     />

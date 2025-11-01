@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassCard } from './GlassCard';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -30,6 +31,7 @@ interface ConnectionSession {
 }
 
 export function QRConnection() {
+  const { t } = useTranslation();
   const [qrCode, setQrCode] = useState('AirShare://connect?session=abc123&key=xyz789');
   const [sessionId, setSessionId] = useState('AS-' + Math.random().toString(36).substr(2, 8).toUpperCase());
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes
@@ -65,7 +67,7 @@ export function QRConnection() {
         };
         
         setSessions(prev => [newSession, ...prev.slice(0, 4)]);
-        toast.success(`${newSession.deviceName} connesso tramite QR!`);
+        toast.success(t('qr.connected_via_qr', { device: newSession.deviceName }));
       }
     }, 5000);
 
@@ -82,18 +84,18 @@ export function QRConnection() {
       setQrCode(`AirShare://connect?session=${newSessionId}&key=${Math.random().toString(36).substr(2, 16)}`);
       setTimeRemaining(300);
       setIsGenerating(false);
-      toast.success('Nuovo QR Code generato!');
+      toast.success(t('qr.generated'));
     }, 1000);
   };
 
   const copyQRCode = () => {
     navigator.clipboard.writeText(qrCode);
-    toast.success('Codice QR copiato negli appunti!');
+    toast.success(t('qr.copied_code'));
   };
 
   const copySessionId = () => {
     navigator.clipboard.writeText(sessionId);
-    toast.success('ID sessione copiato negli appunti!');
+    toast.success(t('qr.copied_session'));
   };
 
   const formatTime = (seconds: number) => {
@@ -118,20 +120,18 @@ export function QRConnection() {
       >
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-xl mb-2">Connessione QR Code</h2>
-            <p className="text-muted-foreground">
-              Connetti rapidamente nuovi dispositivi scannerizzando il QR Code
-            </p>
+            <h2 className="text-xl mb-2">{t('qr.title')}</h2>
+            <p className="text-muted-foreground">{t('qr.subtitle')}</p>
           </div>
           
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="gap-2">
               <Users className="w-3 h-3" />
-              {sessions.filter(s => s.status === 'connected').length} Connessi
+              {sessions.filter(s => s.status === 'connected').length} {t('qr.connected')}
             </Badge>
             <Button onClick={generateNewQR} disabled={isGenerating} size="sm">
               <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-              Rinnova QR
+              {t('qr.renew')}
             </Button>
           </div>
         </div>
@@ -141,7 +141,7 @@ export function QRConnection() {
         {/* QR Code Section */}
         <GlassCard className="p-6">
           <div className="text-center space-y-4">
-            <h3 className="text-lg mb-4">Codice QR Attivo</h3>
+            <h3 className="text-lg mb-4">{t('qr.active_code')}</h3>
             
             {/* QR Code Display */}
             <motion.div
@@ -186,7 +186,7 @@ export function QRConnection() {
                 <Input
                   value={sessionId}
                   readOnly
-                  placeholder="ID Sessione"
+                  placeholder={t('qr.session_id_placeholder')}
                   className="font-mono"
                 />
                 <Button onClick={copySessionId} size="sm" variant="outline">
@@ -199,10 +199,10 @@ export function QRConnection() {
             <div className="bg-muted/50 rounded-lg p-3 text-sm">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="w-4 h-4 text-green-500" />
-                <span className="font-medium">Connessione Sicura</span>
+                <span className="font-medium">{t('qr.secure_connection')}</span>
               </div>
               <p className="text-muted-foreground text-xs">
-                Ogni QR Code ha una durata limitata e include chiavi di crittografia uniche
+                {t('qr.security_note')}
               </p>
             </div>
           </div>
@@ -211,15 +211,15 @@ export function QRConnection() {
         {/* Instructions and Options */}
         <div className="space-y-4">
           <GlassCard className="p-4">
-            <h3 className="mb-3">Come Connettere</h3>
+            <h3 className="mb-3">{t('qr.howto.title')}</h3>
             <div className="space-y-3 text-sm">
               <div className="flex items-start gap-3">
                 <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-medium">
                   1
                 </div>
                 <div>
-                  <p className="font-medium">Apri AirShare sul dispositivo</p>
-                  <p className="text-muted-foreground">Installa l'app se non presente</p>
+                  <p className="font-medium">{t('qr.howto.step1.title')}</p>
+                  <p className="text-muted-foreground">{t('qr.howto.step1.subtitle')}</p>
                 </div>
               </div>
               
@@ -228,8 +228,8 @@ export function QRConnection() {
                   2
                 </div>
                 <div>
-                  <p className="font-medium">Scansiona il QR Code</p>
-                  <p className="text-muted-foreground">Usa la fotocamera o scanner integrato</p>
+                  <p className="font-medium">{t('qr.howto.step2.title')}</p>
+                  <p className="text-muted-foreground">{t('qr.howto.step2.subtitle')}</p>
                 </div>
               </div>
               
@@ -238,40 +238,40 @@ export function QRConnection() {
                   3
                 </div>
                 <div>
-                  <p className="font-medium">Connessione automatica</p>
-                  <p className="text-muted-foreground">Il dispositivo apparirà nella lista</p>
+                  <p className="font-medium">{t('qr.howto.step3.title')}</p>
+                  <p className="text-muted-foreground">{t('qr.howto.step3.subtitle')}</p>
                 </div>
               </div>
             </div>
           </GlassCard>
 
           <GlassCard className="p-4">
-            <h3 className="mb-3">Opzioni Avanzate</h3>
+            <h3 className="mb-3">{t('qr.advanced.title')}</h3>
             <div className="space-y-2">
               <Button variant="outline" size="sm" className="w-full justify-start gap-2">
                 <Globe className="w-4 h-4" />
-                Connessione Guest (24h)
+                {t('qr.advanced.guest')}
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start gap-2">
                 <Lock className="w-4 h-4" />
-                Connessione Protetta da Password
+                {t('qr.advanced.password')}
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start gap-2">
                 <Share2 className="w-4 h-4" />
-                Condividi Link di Invito
+                {t('qr.advanced.share_link')}
               </Button>
             </div>
           </GlassCard>
 
           {/* Recent Connections */}
           <GlassCard className="p-4">
-            <h3 className="mb-3">Connessioni Recenti</h3>
+            <h3 className="mb-3">{t('qr.recent.title')}</h3>
             <div className="space-y-3">
               <AnimatePresence>
                 {sessions.length === 0 ? (
                   <div className="text-center py-4 text-muted-foreground">
                     <QrCode className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Nessuna connessione ancora</p>
+                    <p className="text-sm">{t('qr.recent.empty')}</p>
                   </div>
                 ) : (
                   sessions.map((session, index) => (
@@ -302,8 +302,8 @@ export function QRConnection() {
                           'text-red-600 border-red-200'
                         }>
                           {session.status === 'connected' && <CheckCircle className="w-3 h-3 mr-1" />}
-                          {session.status === 'connected' ? 'Connesso' :
-                           session.status === 'pending' ? 'Attesa' : 'Scaduto'}
+                          {session.status === 'connected' ? t('qr.status.connected') :
+                           session.status === 'pending' ? t('qr.status.pending') : t('qr.status.expired')}
                         </Badge>
                       </div>
                     </motion.div>

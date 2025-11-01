@@ -8,6 +8,7 @@ import { Button } from './ui/button';
 import { Separator } from './ui/separator';
 import { useTheme } from './ThemeProvider';
 import { getVersion } from '@tauri-apps/api/app';
+import { useTranslation } from 'react-i18next';
 
 import itFlag from "../assets/it.jpg";
 import enFlag from "../assets/en.jpg";
@@ -31,12 +32,11 @@ const languages: Language[] = [
   { code: "zh", name: "中文", flagSrc: zhFlag },
 ];
 
-
 export function Settings() {
   const { theme, setTheme } = useTheme();
-  const [selectedLanguage, setSelectedLanguage] = useState('it');
-  const [] = useState(true);
-  const [] = useState(true);
+  const { t, i18n } = useTranslation();
+  // Initialize from i18n current language (persisted via localStorage in i18n.ts) to avoid resetting to Italian
+  const [selectedLanguage, setSelectedLanguage] = useState(() => (i18n.language as string) || 'it');
   const [notifications, setNotifications] = useState(true);
   const [autoAccept, setAutoAccept] = useState(false);
   const [appVersion, setAppVersion] = useState<string>('');
@@ -52,12 +52,29 @@ export function Settings() {
     })();
   }, []);
 
+  // Cambia la lingua quando selectedLanguage cambia
+  useEffect(() => {
+    i18n.changeLanguage(selectedLanguage);
+  }, [selectedLanguage, i18n]);
+
+  // Mantiene sincronizzato lo stato locale quando la lingua cambia altrove
+  useEffect(() => {
+    const handler = (lng: string) => setSelectedLanguage(lng);
+    i18n.on('languageChanged', handler);
+    // Sync immediata all'avvio del componente
+    setSelectedLanguage((i18n.language as string) || 'it');
+    return () => {
+
+      i18n.off('languageChanged', handler);
+    };
+  }, [i18n]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-2">
         <SettingsIcon className="w-5 h-5" />
-        <h2>Impostazioni</h2>
+        <h2>{t('settings.title')}</h2>
       </div>
 
       {/* Appearance Settings */}
@@ -65,12 +82,11 @@ export function Settings() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Palette className="w-4 h-4" />
-            <h3>Aspetto</h3>
+            <h3>{t('settings.appearance')}</h3>
           </div>
-          
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="theme-select">Tema</Label>
+              <Label htmlFor="theme-select">{t('settings.theme')}</Label>
               <Select value={theme} onValueChange={setTheme}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -79,13 +95,13 @@ export function Settings() {
                   <SelectItem value="light">
                     <div className="flex items-center gap-2">
                       <Sun className="w-4 h-4" />
-                      <span>Chiaro</span>
+                      <span>{t('settings.theme_light')}</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="dark">
                     <div className="flex items-center gap-2">
                       <Moon className="w-4 h-4" />
-                      <span>Scuro</span>
+                      <span>{t('settings.theme_dark')}</span>
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -100,11 +116,10 @@ export function Settings() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4" />
-            <h3>Lingua</h3>
+            <h3>{t('settings.language')}</h3>
           </div>
-          
           <div className="space-y-2">
-            <Label htmlFor="language-select">Seleziona lingua dell'interfaccia</Label>
+            <Label htmlFor="language-select">{t('settings.language_select_label')}</Label>
             <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
               <SelectTrigger className="w-full">
                 <SelectValue />
@@ -129,15 +144,14 @@ export function Settings() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Monitor className="w-4 h-4" />
-            <h3>Trasferimenti</h3>
+            <h3>{t('settings.transfers')}</h3>
           </div>
-          
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label>Notifiche</Label>
+                <Label>{t('settings.notifications')}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Ricevi notifiche per trasferimenti completati
+                  {t('settings.notifications_desc')}
                 </p>
               </div>
               <Switch
@@ -150,9 +164,9 @@ export function Settings() {
 
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label>Accettazione automatica</Label>
+                <Label>{t('settings.auto_accept')}</Label>
                 <p className="text-sm text-muted-foreground">
-                  Accetta automaticamente file da dispositivi fidati
+                  {t('settings.auto_accept_desc')}
                 </p>
               </div>
               <Switch
@@ -169,15 +183,13 @@ export function Settings() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
-            <h3>Sicurezza</h3>
+            <h3>{t('settings.security')}</h3>
           </div>
-          
           <div className="space-y-3">
             <Button variant="outline" className="w-full justify-start">
               <Shield className="w-4 h-4 mr-2" />
-              Gestisci dispositivi fidati
+              {t('settings.manage_trusted_devices')}
             </Button>
-            
           </div>
         </div>
       </GlassCard>
@@ -187,28 +199,34 @@ export function Settings() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4" />
-            <h3>Informazioni</h3>
+            <h3>{t('settings.info')}</h3>
           </div>
-          
           <div className="space-y-3 text-sm text-muted-foreground">
             <div className="flex justify-between">
-              <span>Versione</span>
+              <span>{t('settings.version')}</span>
               <span>{appVersion || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span>Build</span>
+              <span>{t('settings.build')}</span>
               <span>2024.01.15</span>
             </div>
           </div>
-          
+
           <Separator />
-          
+
           <div className="space-y-2">
             <Button variant="ghost" className="w-full justify-start p-0 h-auto" onClick={() => { window.location.hash = '#/privacy'; }}>
-              Privacy Policy
+              {t('settings.privacy_policy')}
             </Button>
             <Button variant="ghost" className="w-full justify-start p-0 h-auto" onClick={() => { window.location.hash = '#/terms'; }}>
-              Termini di Servizio
+              {t('settings.terms_of_service')}
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start p-0 h-auto"
+              onClick={() => { window.open('https://github.com/Gecko129/AirShare/issues', '_blank'); }}
+            >
+              {t('settings.support')}
             </Button>
           </div>
         </div>
