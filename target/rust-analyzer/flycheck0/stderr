@@ -1,92 +1,126 @@
-   0.489393042s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint: dependency on `build_script_build` is newer than we are 1761763285.018283587s > 1761742731.193522495s "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-exception-helper-0.1.1"
-   0.489528209s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint: dependency on `build_script_build` is newer than we are 1761763285.877616293s > 1761742731.853580118s "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.2"
-   0.528226000s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint: fingerprint dirty for AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri)/Check { test: false }/TargetInner { ..: lib_target("app_lib", ["staticlib", "cdylib", "rlib"], "/Users/gianluca/Desktop/AirShare/src-tauri/src/lib.rs", Edition2021) }
-   0.529148834s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "tauri_plugin_dialog" })
-   0.599700209s  INFO prepare_target{force=false package_id=tauri v2.9.2 target="tauri"}: cargo::core::compiler::fingerprint: fingerprint dirty for tauri v2.9.2/Check { test: false }/TargetInner { ..: lib_target("tauri", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.9.2/src/lib.rs", Edition2021) }
-   0.599711459s  INFO prepare_target{force=false package_id=tauri v2.9.2 target="tauri"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.606410000s  INFO prepare_target{force=false package_id=muda v0.17.1 target="muda"}: cargo::core::compiler::fingerprint: fingerprint dirty for muda v0.17.1/Check { test: false }/TargetInner { ..: lib_target("muda", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/muda-0.17.1/src/lib.rs", Edition2021) }
-   0.606416917s  INFO prepare_target{force=false package_id=muda v0.17.1 target="muda"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.608113250s  INFO prepare_target{force=false package_id=objc2 v0.6.2 target="objc2"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2 v0.6.2/Check { test: false }/TargetInner { ..: lib_target("objc2", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-0.6.2/src/lib.rs", Edition2021) }
-   0.608119959s  INFO prepare_target{force=false package_id=objc2 v0.6.2 target="objc2"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDependency { name: "build_script_build", dep_mtime: FileTime { seconds: 1761763285, nanos: 877616293 }, max_mtime: FileTime { seconds: 1761742731, nanos: 853580118 } })
-   0.611081750s  INFO prepare_target{force=false package_id=objc2-exception-helper v0.1.1 target="objc2_exception_helper"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-exception-helper v0.1.1/Check { test: false }/TargetInner { ..: lib_target("objc2_exception_helper", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-exception-helper-0.1.1/src/lib.rs", Edition2021) }
-   0.611089000s  INFO prepare_target{force=false package_id=objc2-exception-helper v0.1.1 target="objc2_exception_helper"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDependency { name: "build_script_build", dep_mtime: FileTime { seconds: 1761763285, nanos: 18283587 }, max_mtime: FileTime { seconds: 1761742731, nanos: 193522495 } })
-   0.613011459s  INFO prepare_target{force=false package_id=objc2-app-kit v0.3.1 target="objc2_app_kit"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-app-kit v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_app_kit", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-app-kit-0.3.1/src/lib.rs", Edition2021) }
-   0.613016000s  INFO prepare_target{force=false package_id=objc2-app-kit v0.3.1 target="objc2_app_kit"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "block2" })
-   0.613687875s  INFO prepare_target{force=false package_id=block2 v0.6.1 target="block2"}: cargo::core::compiler::fingerprint: fingerprint dirty for block2 v0.6.1/Check { test: false }/TargetInner { ..: lib_target("block2", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/block2-0.6.1/src/lib.rs", Edition2021) }
-   0.613694250s  INFO prepare_target{force=false package_id=block2 v0.6.1 target="block2"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.614799250s  INFO prepare_target{force=false package_id=objc2-cloud-kit v0.3.1 target="objc2_cloud_kit"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-cloud-kit v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_cloud_kit", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-cloud-kit-0.3.1/src/lib.rs", Edition2021) }
-   0.614804292s  INFO prepare_target{force=false package_id=objc2-cloud-kit v0.3.1 target="objc2_cloud_kit"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.615663834s  INFO prepare_target{force=false package_id=objc2-foundation v0.3.1 target="objc2_foundation"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-foundation v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_foundation", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-foundation-0.3.1/src/lib.rs", Edition2021) }
-   0.615669709s  INFO prepare_target{force=false package_id=objc2-foundation v0.3.1 target="objc2_foundation"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "block2" })
-   0.616169000s  INFO prepare_target{force=false package_id=objc2-core-foundation v0.3.1 target="objc2_core_foundation"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-core-foundation v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_core_foundation", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-core-foundation-0.3.1/src/lib.rs", Edition2021) }
-   0.616173667s  INFO prepare_target{force=false package_id=objc2-core-foundation v0.3.1 target="objc2_core_foundation"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.616651834s  INFO prepare_target{force=false package_id=objc2-core-data v0.3.1 target="objc2_core_data"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-core-data v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_core_data", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-core-data-0.3.1/src/lib.rs", Edition2021) }
-   0.616655792s  INFO prepare_target{force=false package_id=objc2-core-data v0.3.1 target="objc2_core_data"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.617022875s  INFO prepare_target{force=false package_id=objc2-core-graphics v0.3.1 target="objc2_core_graphics"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-core-graphics v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_core_graphics", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-core-graphics-0.3.1/src/lib.rs", Edition2021) }
-   0.617029084s  INFO prepare_target{force=false package_id=objc2-core-graphics v0.3.1 target="objc2_core_graphics"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.617530959s  INFO prepare_target{force=false package_id=objc2-core-image v0.3.1 target="objc2_core_image"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-core-image v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_core_image", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-core-image-0.3.1/src/lib.rs", Edition2021) }
-   0.617535000s  INFO prepare_target{force=false package_id=objc2-core-image v0.3.1 target="objc2_core_image"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.617923792s  INFO prepare_target{force=false package_id=objc2-quartz-core v0.3.1 target="objc2_quartz_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-quartz-core v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_quartz_core", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-quartz-core-0.3.1/src/lib.rs", Edition2021) }
-   0.617928792s  INFO prepare_target{force=false package_id=objc2-quartz-core v0.3.1 target="objc2_quartz_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.621424625s  INFO prepare_target{force=false package_id=objc2-web-kit v0.3.1 target="objc2_web_kit"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-web-kit v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_web_kit", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-web-kit-0.3.1/src/lib.rs", Edition2021) }
-   0.621429375s  INFO prepare_target{force=false package_id=objc2-web-kit v0.3.1 target="objc2_web_kit"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "block2" })
-   0.622159000s  INFO prepare_target{force=false package_id=objc2-javascript-core v0.3.1 target="objc2_javascript_core"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-javascript-core v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_javascript_core", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-javascript-core-0.3.1/src/lib.rs", Edition2021) }
-   0.622162500s  INFO prepare_target{force=false package_id=objc2-javascript-core v0.3.1 target="objc2_javascript_core"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.622511125s  INFO prepare_target{force=false package_id=objc2-security v0.3.1 target="objc2_security"}: cargo::core::compiler::fingerprint: fingerprint dirty for objc2-security v0.3.1/Check { test: false }/TargetInner { ..: lib_target("objc2_security", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/objc2-security-0.3.1/src/lib.rs", Edition2021) }
-   0.622516000s  INFO prepare_target{force=false package_id=objc2-security v0.3.1 target="objc2_security"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.630279834s  INFO prepare_target{force=false package_id=tauri-runtime v2.9.1 target="tauri_runtime"}: cargo::core::compiler::fingerprint: fingerprint dirty for tauri-runtime v2.9.1/Check { test: false }/TargetInner { ..: lib_target("tauri_runtime", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.9.1/src/lib.rs", Edition2021) }
-   0.630284334s  INFO prepare_target{force=false package_id=tauri-runtime v2.9.1 target="tauri_runtime"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.650384334s  INFO prepare_target{force=false package_id=tauri-runtime-wry v2.9.1 target="tauri_runtime_wry"}: cargo::core::compiler::fingerprint: fingerprint dirty for tauri-runtime-wry v2.9.1/Check { test: false }/TargetInner { ..: lib_target("tauri_runtime_wry", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-wry-2.9.1/src/lib.rs", Edition2021) }
-   0.650390875s  INFO prepare_target{force=false package_id=tauri-runtime-wry v2.9.1 target="tauri_runtime_wry"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.651077709s  INFO prepare_target{force=false package_id=tao v0.34.5 target="tao"}: cargo::core::compiler::fingerprint: fingerprint dirty for tao v0.34.5/Check { test: false }/TargetInner { ..: lib_target("tao", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.34.5/src/lib.rs", Edition2021) }
-   0.651082667s  INFO prepare_target{force=false package_id=tao v0.34.5 target="tao"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "block2" })
-   0.654126417s  INFO prepare_target{force=false package_id=wry v0.53.5 target="wry"}: cargo::core::compiler::fingerprint: fingerprint dirty for wry v0.53.5/Check { test: false }/TargetInner { ..: lib_target("wry", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wry-0.53.5/src/lib.rs", Edition2021) }
-   0.654130334s  INFO prepare_target{force=false package_id=wry v0.53.5 target="wry"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "block2" })
-   0.657189250s  INFO prepare_target{force=false package_id=window-vibrancy v0.6.0 target="window_vibrancy"}: cargo::core::compiler::fingerprint: fingerprint dirty for window-vibrancy v0.6.0/Check { test: false }/TargetInner { ..: lib_target("window_vibrancy", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/window-vibrancy-0.6.0/src/lib.rs", Edition2021) }
-   0.657195125s  INFO prepare_target{force=false package_id=window-vibrancy v0.6.0 target="window_vibrancy"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "objc2" })
-   0.658151084s  INFO prepare_target{force=false package_id=tauri-plugin-dialog v2.4.0 target="tauri_plugin_dialog"}: cargo::core::compiler::fingerprint: fingerprint dirty for tauri-plugin-dialog v2.4.0/Check { test: false }/TargetInner { ..: lib_target("tauri_plugin_dialog", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.4.0/src/lib.rs", Edition2021) }
-   0.658155042s  INFO prepare_target{force=false package_id=tauri-plugin-dialog v2.4.0 target="tauri_plugin_dialog"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "rfd" })
-   0.659508250s  INFO prepare_target{force=false package_id=rfd v0.15.4 target="rfd"}: cargo::core::compiler::fingerprint: fingerprint dirty for rfd v0.15.4/Check { test: false }/TargetInner { ..: lib_target("rfd", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rfd-0.15.4/src/lib.rs", Edition2021) }
-   0.659513167s  INFO prepare_target{force=false package_id=rfd v0.15.4 target="rfd"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "dispatch2" })
-   0.660768709s  INFO prepare_target{force=false package_id=dispatch2 v0.3.0 target="dispatch2"}: cargo::core::compiler::fingerprint: fingerprint dirty for dispatch2 v0.3.0/Check { test: false }/TargetInner { ..: lib_target("dispatch2", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/dispatch2-0.3.0/src/lib.rs", Edition2021) }
-   0.660772375s  INFO prepare_target{force=false package_id=dispatch2 v0.3.0 target="dispatch2"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "block2" })
-   0.662467500s  INFO prepare_target{force=false package_id=tauri-plugin-fs v2.4.2 target="tauri_plugin_fs"}: cargo::core::compiler::fingerprint: fingerprint dirty for tauri-plugin-fs v2.4.2/Check { test: false }/TargetInner { ..: lib_target("tauri_plugin_fs", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-fs-2.4.2/src/lib.rs", Edition2021) }
-   0.662472375s  INFO prepare_target{force=false package_id=tauri-plugin-fs v2.4.2 target="tauri_plugin_fs"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "tauri" })
-   0.663259084s  INFO prepare_target{force=false package_id=tauri-plugin-log v2.7.0 target="tauri_plugin_log"}: cargo::core::compiler::fingerprint: fingerprint dirty for tauri-plugin-log v2.7.0/Check { test: false }/TargetInner { ..: lib_target("tauri_plugin_log", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-log-2.7.0/src/lib.rs", Edition2021) }
-   0.663261750s  INFO prepare_target{force=false package_id=tauri-plugin-log v2.7.0 target="tauri_plugin_log"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "tauri" })
-   0.667524167s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint: fingerprint dirty for AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri)/Check { test: true }/TargetInner { ..: lib_target("app_lib", ["staticlib", "cdylib", "rlib"], "/Users/gianluca/Desktop/AirShare/src-tauri/src/lib.rs", Edition2021) }
-   0.667528917s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "tauri_plugin_dialog" })
-   0.668803125s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="AirShare"}: cargo::core::compiler::fingerprint: fingerprint dirty for AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri)/Check { test: false }/TargetInner { name: "AirShare", doc: true, ..: with_path("/Users/gianluca/Desktop/AirShare/src-tauri/src/main.rs", Edition2021) }
-   0.668809792s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="AirShare"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "app_lib" })
-   0.670067792s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="AirShare"}: cargo::core::compiler::fingerprint: fingerprint dirty for AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri)/Check { test: true }/TargetInner { name: "AirShare", doc: true, ..: with_path("/Users/gianluca/Desktop/AirShare/src-tauri/src/main.rs", Edition2021) }
-   0.670073084s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="AirShare"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "app_lib" })
-    Checking objc2-exception-helper v0.1.1
-    Checking objc2 v0.6.2
-    Checking objc2-core-foundation v0.3.1
-    Checking block2 v0.6.1
-    Checking objc2-javascript-core v0.3.1
-    Checking dispatch2 v0.3.0
-    Checking objc2-foundation v0.3.1
-    Checking objc2-core-graphics v0.3.1
-    Checking objc2-security v0.3.1
-    Checking objc2-quartz-core v0.3.1
-    Checking objc2-core-image v0.3.1
-    Checking objc2-cloud-kit v0.3.1
-    Checking objc2-core-data v0.3.1
-    Checking objc2-app-kit v0.3.1
-    Checking objc2-web-kit v0.3.1
-    Checking tao v0.34.5
-    Checking window-vibrancy v0.6.0
-    Checking muda v0.17.1
-    Checking rfd v0.15.4
-    Checking tauri-runtime v2.9.1
-    Checking wry v0.53.5
-    Checking tauri-runtime-wry v2.9.1
-    Checking tauri v2.9.2
-    Checking tauri-plugin-fs v2.4.2
-    Checking tauri-plugin-log v2.7.0
-    Checking tauri-plugin-dialog v2.4.0
+   0.455532375s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint: fingerprint error for AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri)/Check { test: false }/TargetInner { ..: lib_target("app_lib", ["staticlib", "cdylib", "rlib"], "/Users/gianluca/Desktop/AirShare/src-tauri/src/lib.rs", Edition2021) }
+   0.455752417s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/gianluca/Desktop/AirShare/src-tauri/target/debug/.fingerprint/AirShare-17117af793b748ea/lib-app_lib`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   7: cargo::ops::cargo_compile::compile_ws
+   8: cargo::ops::cargo_compile::compile_with_exec
+   9: cargo::ops::cargo_compile::compile
+  10: cargo::commands::check::exec
+  11: <cargo::cli::Exec>::exec
+  12: cargo::main
+  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  14: std::rt::lang_start::<()>::{closure#0}
+  15: std::rt::lang_start_internal
+  16: _main
+   0.539187084s  INFO prepare_target{force=false package_id=sysinfo v0.32.1 target="sysinfo"}: cargo::core::compiler::fingerprint: fingerprint error for sysinfo v0.32.1/Check { test: false }/TargetInner { ..: lib_target("sysinfo", ["lib"], "/Users/gianluca/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sysinfo-0.32.1/src/lib.rs", Edition2021) }
+   0.539289709s  INFO prepare_target{force=false package_id=sysinfo v0.32.1 target="sysinfo"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/gianluca/Desktop/AirShare/src-tauri/target/debug/.fingerprint/sysinfo-d9dc5ec52cb33dfb/lib-sysinfo`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.583278709s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint: fingerprint error for AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri)/Check { test: true }/TargetInner { ..: lib_target("app_lib", ["staticlib", "cdylib", "rlib"], "/Users/gianluca/Desktop/AirShare/src-tauri/src/lib.rs", Edition2021) }
+   0.583291542s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="app_lib"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/gianluca/Desktop/AirShare/src-tauri/target/debug/.fingerprint/AirShare-dc191e6cc2369302/test-lib-app_lib`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   7: cargo::ops::cargo_compile::compile_ws
+   8: cargo::ops::cargo_compile::compile_with_exec
+   9: cargo::ops::cargo_compile::compile
+  10: cargo::commands::check::exec
+  11: <cargo::cli::Exec>::exec
+  12: cargo::main
+  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  14: std::rt::lang_start::<()>::{closure#0}
+  15: std::rt::lang_start_internal
+  16: _main
+   0.584686375s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="AirShare"}: cargo::core::compiler::fingerprint: fingerprint error for AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri)/Check { test: false }/TargetInner { name: "AirShare", doc: true, ..: with_path("/Users/gianluca/Desktop/AirShare/src-tauri/src/main.rs", Edition2021) }
+   0.584696625s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="AirShare"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/gianluca/Desktop/AirShare/src-tauri/target/debug/.fingerprint/AirShare-1c4700a9263ba4dd/bin-AirShare`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   7: cargo::ops::cargo_compile::compile_ws
+   8: cargo::ops::cargo_compile::compile_with_exec
+   9: cargo::ops::cargo_compile::compile
+  10: cargo::commands::check::exec
+  11: <cargo::cli::Exec>::exec
+  12: cargo::main
+  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  14: std::rt::lang_start::<()>::{closure#0}
+  15: std::rt::lang_start_internal
+  16: _main
+   0.586230709s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="AirShare"}: cargo::core::compiler::fingerprint: fingerprint error for AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri)/Check { test: true }/TargetInner { name: "AirShare", doc: true, ..: with_path("/Users/gianluca/Desktop/AirShare/src-tauri/src/main.rs", Edition2021) }
+   0.586239167s  INFO prepare_target{force=false package_id=AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri) target="AirShare"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/gianluca/Desktop/AirShare/src-tauri/target/debug/.fingerprint/AirShare-879c1ea22bd40781/test-bin-AirShare`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: cargo_util::paths::read_bytes
+   2: cargo_util::paths::read
+   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   4: cargo::core::compiler::fingerprint::prepare_target
+   5: cargo::core::compiler::compile
+   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   7: cargo::ops::cargo_compile::compile_ws
+   8: cargo::ops::cargo_compile::compile_with_exec
+   9: cargo::ops::cargo_compile::compile
+  10: cargo::commands::check::exec
+  11: <cargo::cli::Exec>::exec
+  12: cargo::main
+  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  14: std::rt::lang_start::<()>::{closure#0}
+  15: std::rt::lang_start_internal
+  16: _main
+    Checking sysinfo v0.32.1
     Checking AirShare v0.4.0 (/Users/gianluca/Desktop/AirShare/src-tauri)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 34.26s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.86s
 warning: the following packages contain code that will be rejected by a future version of Rust: bitflags v0.7.0
 note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
