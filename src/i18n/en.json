@@ -50,6 +50,7 @@
   "settings.auto_accept_desc": "Automatically accept files from trusted devices",
   "settings.security": "Security",
   "settings.manage_trusted_devices": "Manage trusted devices",
+  "trust_device_checkbox": "Remember and trust this device",
   "settings.info": "Information",
   "settings.version": "Version",
   "settings.build": "Build",

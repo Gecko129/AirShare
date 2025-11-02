@@ -16,10 +16,43 @@ import { useTranslation } from "react-i18next";
 export function TransferPrompt() {
   const [open, setOpen] = useState(false);
   const [transfer, setTransfer] = useState<any>(null);
+  const [trustDevice, setTrustDevice] = useState(false);
   const { t } = useTranslation();
+
+  // Normalizza il nome del dispositivo come in DeviceDetection
+  const normalizeDeviceName = (payload: any): string => {
+    // Prova diversi campi dove potrebbe essere il nome
+    const nameCandidate = 
+      payload?.device_name || 
+      payload?.sender || 
+      payload?.from_device || 
+      payload?.remote_name ||
+      payload?.device ||
+      payload?.ip ||
+      "Dispositivo";
+
+    // Se è un IP (es. "192.168.1.100"), mantienilo così
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(nameCandidate)) {
+      return nameCandidate;
+    }
+
+    // Normalizza il nome usando la stessa logica di DeviceDetection
+    const lower = String(nameCandidate).toLowerCase();
+    let type = 'other';
+    
+    if (lower.includes('iphone') || lower.includes('ipad') || lower.includes('ios')) type = 'iphone';
+    else if (lower.includes('android')) type = 'android';
+    else if (lower.includes('mac') || lower.includes('macbook') || lower.includes('darwin')) type = 'macos';
+    else if (lower.includes('win') || lower.includes('windows')) type = 'windows';
+    else if (lower.includes('linux')) type = 'linux';
+
+    // Ritorna il nome normalizzato
+    return nameCandidate || "Dispositivo";
+  };
 
   useEffect(() => {
     const unlistenPromise = listen("transfer_request", (event) => {
+      console.log("📦 [TransferPrompt] Evento ricevuto:", event.payload);
       setTransfer(event.payload);
       setOpen(true);
     });
@@ -29,22 +62,27 @@ export function TransferPrompt() {
   }, []);
 
   const handleResponse = async (accept: boolean) => {
-    if (!transfer) return;
-    try {
-      // Correzione: usa la struttura corretta dei parametri
-      await invoke("respond_transfer", {
+  if (!transfer) return;
+  try {
+    // Estrai l'IP dal payload dell'evento
+    const senderIp = transfer.ip || transfer.sender_ip;
+    
+    await invoke("respond_transfer", {
+      args: {
         transfer_id: transfer.offer?.transfer_id || transfer.transfer_id || transfer.id,
         accept,
-      });
-    } catch (error) {
-      console.error("Errore durante la risposta al trasferimento:", error);
-    } finally {
-      setOpen(false);
-      setTransfer(null);
-    }
-  };
+        trust: trustDevice,
+      },
+    });
+  } catch (error) {
+    console.error("Errore durante la risposta al trasferimento:", error);
+  } finally {
+    setOpen(false);
+    setTransfer(null);
+    setTrustDevice(false);
+  }
+};
 
-  // Funzione per formattare la dimensione del file in modo leggibile (KB, MB, GB)
   function formatFileSize(bytes: number): string {
     if (bytes === 0 || !bytes) return "0 KB";
     const kb = bytes / 1024;
@@ -54,6 +92,8 @@ export function TransferPrompt() {
     const gb = mb / 1024;
     return `${gb.toFixed(2)} GB`;
   }
+
+  const deviceName = normalizeDeviceName(transfer || {});
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -71,12 +111,24 @@ export function TransferPrompt() {
           </AlertDialogTitle>
           <AlertDialogDescription style={{ color: "#d4d4d8" }}>
             {t("transfer_request_description", {
-              device: transfer?.device_name || "Dispositivo",
+              device: deviceName,
               file: transfer?.offer?.file_name,
               size: formatFileSize(transfer?.offer?.file_size || 0),
             })}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {/* Trust device checkbox */}
+        <div className="flex items-center gap-2 mt-3">
+          <input
+            id="trust-device"
+            type="checkbox"
+            checked={trustDevice}
+            onChange={(e) => setTrustDevice(e.target.checked)}
+          />
+          <label htmlFor="trust-device" className="text-sm text-zinc-300">
+            {t("trust_device_checkbox", "Ricorda e considera attendibile questo dispositivo")}
+          </label>
+        </div>
         <AlertDialogFooter>
           <AlertDialogCancel
             onClick={() => handleResponse(false)}

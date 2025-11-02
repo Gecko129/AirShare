@@ -9,6 +9,7 @@ import { Separator } from './ui/separator';
 import { useTheme } from './ThemeProvider';
 import { getVersion } from '@tauri-apps/api/app';
 import { useTranslation } from 'react-i18next';
+import { TrustedDevicesManager } from './TrustedDevicesManager';
 
 import itFlag from "../assets/it.jpg";
 import enFlag from "../assets/en.jpg";
@@ -35,11 +36,29 @@ const languages: Language[] = [
 export function Settings() {
   const { theme, setTheme } = useTheme();
   const { t, i18n } = useTranslation();
+  
   // Initialize from i18n current language (persisted via localStorage in i18n.ts) to avoid resetting to Italian
   const [selectedLanguage, setSelectedLanguage] = useState(() => (i18n.language as string) || 'it');
   const [notifications, setNotifications] = useState(true);
   const [autoAccept, setAutoAccept] = useState(false);
   const [appVersion, setAppVersion] = useState<string>('');
+  const [showTrustedDevices, setShowTrustedDevices] = useState(false);
+
+  // Sync auto-accept with backend settings
+  useEffect(() => {
+    // lazy import to avoid bundling tauri api in environments where not present
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke<boolean>("get_auto_accept_trusted").then((val) => {
+        setAutoAccept(!!val);
+      }).catch(() => {});
+    });
+  }, []);
+
+  useEffect(() => {
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke("set_auto_accept_trusted", { value: autoAccept }).catch(() => {});
+    });
+  }, [autoAccept]);
 
   useEffect(() => {
     (async () => {
@@ -64,7 +83,6 @@ export function Settings() {
     // Sync immediata all'avvio del componente
     setSelectedLanguage((i18n.language as string) || 'it');
     return () => {
-
       i18n.off('languageChanged', handler);
     };
   }, [i18n]);
@@ -186,7 +204,11 @@ export function Settings() {
             <h3>{t('settings.security')}</h3>
           </div>
           <div className="space-y-3">
-            <Button variant="outline" className="w-full justify-start">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start"
+              onClick={() => setShowTrustedDevices(true)}
+            >
               <Shield className="w-4 h-4 mr-2" />
               {t('settings.manage_trusted_devices')}
             </Button>
@@ -231,6 +253,12 @@ export function Settings() {
           </div>
         </div>
       </GlassCard>
+
+      {/* Trusted Devices Manager Dialog */}
+      <TrustedDevicesManager 
+        open={showTrustedDevices} 
+        onOpenChange={setShowTrustedDevices} 
+      />
     </div>
   );
 }

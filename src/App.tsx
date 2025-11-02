@@ -24,22 +24,102 @@ import { TransferHistory } from "./components/TransferHistory";
 import { CanvasBackground } from "./components/CanvasBackground";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import TermsOfService from "./components/TermsOfService";
+import { TransferPrompt } from "./components/TransferPrompt";
+import { AutoAcceptNotification } from './components/AutoAcceptNotification';
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
+interface UploadFile {
+  name: string;
+  size: number;
+  path?: string;
+}
+
+type BackendTransferRecord = {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  transferType: 'sent' | 'received';
+  status: 'completed' | 'cancelled' | 'failed';
+  fromDevice: string;
+  toDevice: string;
+  startTime: string;
+  duration: number;
+  speed: number;
+  deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+};
 
 function AppContent() {
   const { t } = useTranslation();
-  const [selectedDevices, setSelectedDevices] = useState<any[]>(
-    [],
-  );
+  const [selectedDevices, setSelectedDevices] = useState<any[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<UploadFile[]>([]);
   const [activeTab, setActiveTab] = useState("transfer");
   const [avgSpeedToday, setAvgSpeedToday] = useState<number>(0);
-  const [networkSpeed, setNetworkSpeed] = useState<number>(0);
   const [route, setRoute] = useState<string>(window.location.hash || "");
+
+  // Controlla se una data è "oggi"
+  const isToday = (dateString: string): boolean => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      return (
+        date.getFullYear() === now.getFullYear() &&
+        date.getMonth() === now.getMonth() &&
+        date.getDate() === now.getDate()
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  // Carica i trasferimenti di oggi dal backend e calcola media velocità
+  const loadTodayStats = async () => {
+    try {
+      const data = await invoke<BackendTransferRecord[]>('get_recent_transfers');
+      
+      // Filtra: solo di oggi e completati
+      const today = data.filter(r => isToday(r.startTime) && r.status === 'completed');
+      
+      if (today.length > 0) {
+        const sum = today.reduce((acc, r) => acc + (typeof r.speed === 'number' ? r.speed : 0), 0);
+        const avg = Math.round((sum / today.length) * 10) / 10;
+        setAvgSpeedToday(avg);
+      } else {
+        setAvgSpeedToday(0);
+      }
+    } catch (e) {
+      // Fallback silenzioso
+      setAvgSpeedToday(0);
+    }
+  };
 
   useEffect(() => {
     const onHashChange = () => setRoute(window.location.hash || "");
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  // Poll today's stats ogni 5s
+  useEffect(() => {
+    loadTodayStats();
+    const id = setInterval(loadTodayStats, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Ricarica su transfer_complete event
+  useEffect(() => {
+    let unlistenFn: any;
+    (async () => {
+      try {
+        unlistenFn = await listen('transfer_complete', () => {
+          loadTodayStats();
+        });
+      } catch {}
+    })();
+    
+    return () => {
+      if (unlistenFn) unlistenFn();
+    };
   }, []);
 
   const isPrivacy = route === "#/privacy";
@@ -63,6 +143,7 @@ function AppContent() {
         <div className="absolute top-3/4 right-1/4 w-80 h-80 bg-purple-500/4 dark:bg-purple-400/2 rounded-full blur-3xl animate-pulse delay-1000" />
         <div className="absolute bottom-1/4 left-1/2 w-64 h-64 bg-pink-500/4 dark:bg-pink-400/2 rounded-full blur-3xl animate-pulse delay-2000" />
       </div>
+      
       {/* Header */}
       <header className="border-b backdrop-blur-md bg-background/85 dark:bg-background/70 sticky top-0 z-50 relative">
         <div className="max-w-6xl mx-auto px-6 py-4">
@@ -111,10 +192,7 @@ function AppContent() {
             <div className="space-y-4 relative z-30">
               <DynamicSidebar
                 selectedDevices={selectedDevices}
-                avgSpeedToday={avgSpeedToday}
-                networkSpeed={networkSpeed}
-                context="settings"
-              />
+                context="settings" networkSpeed={0}              />
             </div>
           </div>
         ) : isTerms ? (
@@ -124,11 +202,8 @@ function AppContent() {
             </div>
             <div className="space-y-4 relative z-30">
               <DynamicSidebar
-                selectedDevices={selectedDevices}
-                avgSpeedToday={avgSpeedToday}
-                networkSpeed={networkSpeed}
-                context="settings"
-              />
+                  selectedDevices={selectedDevices}
+                  context="settings" networkSpeed={0}              />
             </div>
           </div>
         ) : (
@@ -203,27 +278,6 @@ function AppContent() {
                   <span className="text-sm font-medium">{t('tabs.history')}</span>
                 </div>
               </TabsTrigger>
-              {/* <TabsTrigger
-  value="qr"
-  className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
->
-  <motion.div
-    className="absolute inset-2 bg-gradient-to-r from-purple-500/25 to-pink-500/25 rounded-lg shadow-sm border border-white/20 dark:border-white/10"
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{
-      opacity: activeTab === "qr" ? 1 : 0,
-      scale: activeTab === "qr" ? 1 : 0.95,
-    }}
-    transition={{
-      duration: 0.3,
-      ease: "easeOut",
-    }}
-  />
-  <div className="relative z-10 flex items-center justify-center gap-2 transition-transform group-hover:scale-105">
-    <QrCode className="w-4 h-4" />
-    <span className="text-sm font-medium">QR Code</span>
-  </div>
-</TabsTrigger> */}
               <TabsTrigger
                 value="settings"
                 className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
@@ -284,6 +338,8 @@ function AppContent() {
                     >
                       <FileTransfer
                         selectedDevices={selectedDevices}
+                        selectedFiles={selectedFiles}
+                        onFilesChange={setSelectedFiles}
                       />
                     </motion.div>
                   </div>
@@ -296,11 +352,8 @@ function AppContent() {
                     className="space-y-4 relative z-30"
                   >
                     <DynamicSidebar
-                      selectedDevices={selectedDevices}
-                      avgSpeedToday={avgSpeedToday}
-                      networkSpeed={networkSpeed}
-                      context="transfer"
-                    />
+                            selectedDevices={selectedDevices}
+                            context="transfer" networkSpeed={0}                    />
                   </motion.div>
                 </motion.div>
               </TabsContent>
@@ -342,15 +395,16 @@ function AppContent() {
                     className="space-y-4 relative z-30"
                   >
                     <DynamicSidebar
-                      selectedDevices={selectedDevices}
-                      avgSpeedToday={avgSpeedToday}
-                      networkSpeed={networkSpeed}
-                      context="devices"
-                    />
+                            selectedDevices={selectedDevices}
+                            context="devices" networkSpeed={0}                    />
                   </motion.div>
                 </motion.div>
               </TabsContent>
             )}
+
+            {/* Aggiungi questo componente */}
+      <AutoAcceptNotification />
+
 
             {/* History Tab */}
             {activeTab === "history" && (
@@ -385,11 +439,8 @@ function AppContent() {
                     className="space-y-4 relative z-30"
                   >
                     <DynamicSidebar
-                      selectedDevices={selectedDevices}
-                      avgSpeedToday={avgSpeedToday}
-                      networkSpeed={networkSpeed}
-                      context="history"
-                    />
+                            selectedDevices={selectedDevices}
+                            context="history" networkSpeed={0}                    />
                   </motion.div>
                 </motion.div>
               </TabsContent>
@@ -428,11 +479,8 @@ function AppContent() {
                     className="space-y-4 relative z-30"
                   >
                     <DynamicSidebar
-                      selectedDevices={selectedDevices}
-                      avgSpeedToday={avgSpeedToday}
-                      networkSpeed={networkSpeed}
-                      context="settings"
-                    />
+                            selectedDevices={selectedDevices}
+                            context="settings" networkSpeed={0}                    />
                   </motion.div>
                 </motion.div>
               </TabsContent>
@@ -441,6 +489,8 @@ function AppContent() {
         </Tabs>
         )}
       </main>
+      {/* Mount global TransferPrompt listener */}
+      <TransferPrompt />
     </div>
   );
 }

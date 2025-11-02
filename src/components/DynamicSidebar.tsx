@@ -25,7 +25,6 @@ import { listen } from '@tauri-apps/api/event';
 interface DynamicSidebarProps {
   selectedDevices: any[];
   networkSpeed: number;
-  avgSpeedToday?: number;
   context: 'transfer' | 'devices' | 'history' | 'qr' | 'settings';
 }
 
@@ -36,34 +35,35 @@ interface TipContent {
 }
 
 interface StatsContent {
+  key: 'transfers' | 'avg_speed' | 'cpu' | 'memory';
   icon: React.ReactNode;
   title: string;
   value: string;
   trend?: 'up' | 'down' | 'stable';
 }
 
+type BackendTransferRecord = {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  transferType: 'sent' | 'received';
+  status: 'completed' | 'cancelled' | 'failed';
+  fromDevice: string;
+  toDevice: string;
+  startTime: string;
+  duration: number;
+  speed: number;
+  deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+};
+
 export function DynamicSidebar({ selectedDevices, networkSpeed, context }: DynamicSidebarProps) {
   const { t } = useTranslation();
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [currentStatsIndex, setCurrentStatsIndex] = useState(0);
-  const [cpuUsage] = useState(Math.floor(Math.random() * 40) + 20);
-  const [memoryUsage] = useState(Math.floor(Math.random() * 30) + 40);
+  const [cpuUsage, setCpuUsage] = useState<number>(0);
+  const [memoryUsage, setMemoryUsage] = useState<number>(0);
   const [avgSpeedToday, setAvgSpeedToday] = useState<number>(0);
   const [transfersTodayCount, setTransfersTodayCount] = useState<number>(0);
-
-  type BackendTransferRecord = {
-    id: string;
-    fileName: string;
-    fileSize: number;
-    transferType: 'sent' | 'received';
-    status: 'completed' | 'cancelled' | 'failed';
-    fromDevice: string;
-    toDevice: string;
-    startTime: string;
-    duration: number;
-    speed: number;
-    deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
-  };
 
   const selectedDeviceKeys = useMemo(() => {
     const names = new Set<string>();
@@ -75,43 +75,78 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
     return { names, ips };
   }, [selectedDevices]);
 
-  const isToday = (date: Date) => {
-    const now = new Date();
-    return (
-      date.getFullYear() === now.getFullYear() &&
-      date.getMonth() === now.getMonth() &&
-      date.getDate() === now.getDate()
-    );
+  // Controlla se una data è "oggi"
+  const isToday = (dateString: string): boolean => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      return (
+        date.getFullYear() === now.getFullYear() &&
+        date.getMonth() === now.getMonth() &&
+        date.getDate() === now.getDate()
+      );
+    } catch {
+      return false;
+    }
   };
 
+  // Calcola stats di oggi dal frontend
   const computeTodayStats = (records: BackendTransferRecord[]) => {
+    // Filtra: solo di oggi, completati, e con device selezionati (se c'è selezione)
+    const hasSelection = selectedDeviceKeys.names.size > 0 || selectedDeviceKeys.ips.size > 0;
+    
     const relevant = records.filter(r => {
-      const dt = new Date(r.startTime);
-      if (!isToday(dt)) return false;
-      const involvesSelected =
-        selectedDeviceKeys.names.has(r.fromDevice) ||
-        selectedDeviceKeys.names.has(r.toDevice) ||
-        selectedDeviceKeys.ips.has(r.fromDevice) ||
-        selectedDeviceKeys.ips.has(r.toDevice);
-      return involvesSelected;
+      // Deve essere di oggi
+      if (!isToday(r.startTime)) return false;
+      
+      // Se c'è selezione, controlla se coinvolge device selezionati
+      if (hasSelection) {
+        const involvesSelected =
+          selectedDeviceKeys.names.has(r.fromDevice) ||
+          selectedDeviceKeys.names.has(r.toDevice) ||
+          selectedDeviceKeys.ips.has(r.fromDevice) ||
+          selectedDeviceKeys.ips.has(r.toDevice);
+        return involvesSelected;
+      }
+      
+      return true;
     });
 
+    // Considera solo i completati
     const completed = relevant.filter(r => r.status === 'completed');
     const count = completed.length;
+    
+    // Calcola media velocità
     const avg = count > 0
-      ? completed.reduce((acc, r) => acc + (typeof r.speed === 'number' ? r.speed : 0), 0) / count
+      ? Math.round(
+          (completed.reduce((acc, r) => acc + (typeof r.speed === 'number' ? r.speed : 0), 0) / count) * 10
+        ) / 10
       : 0;
 
     setTransfersTodayCount(count);
     setAvgSpeedToday(avg);
   };
 
+  // Carica i trasferimenti recenti e calcola stats localmente
   const loadRecentTransfers = async () => {
     try {
       const data = await invoke<BackendTransferRecord[]>('get_recent_transfers');
       computeTodayStats(data);
     } catch (e) {
-      // fail-silent
+      // Fallback silenzioso
+    }
+  };
+
+  // Carica system stats (CPU/Memory)
+  const loadSystemStats = async () => {
+    try {
+      const res = await invoke<{ cpu: number; memory: number }>('get_system_stats');
+      if (res) {
+        setCpuUsage(Math.round(res.cpu));
+        setMemoryUsage(Math.round(res.memory));
+      }
+    } catch (e) {
+      // ignore
     }
   };
 
@@ -205,26 +240,31 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
         : avgSpeedToday >= networkSpeed
         ? 'up'
         : 'down';
+    
     return [
       {
+        key: 'transfers',
         icon: <Activity className="w-4 h-4" />,
         title: t('sidebar.stats.transfers'),
         value: String(transfersTodayCount),
         trend: 'stable'
       },
       {
+        key: 'avg_speed',
         icon: <TrendingUp className="w-4 h-4" />,
         title: t('sidebar.stats.avg_speed'),
         value: `${avgSpeedToday.toFixed(1)} MB/s`,
         trend: speedTrend
       },
       {
+        key: 'cpu',
         icon: <Cpu className="w-4 h-4" />,
         title: t('sidebar.stats.cpu'),
         value: `${cpuUsage}%`,
         trend: cpuUsage > 60 ? 'up' : 'stable'
       },
       {
+        key: 'memory',
         icon: <HardDrive className="w-4 h-4" />,
         title: t('sidebar.stats.memory'),
         value: `${memoryUsage}%`,
@@ -236,7 +276,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
   const tips = getTips();
   const stats = getStats();
 
-  // Rotate tips every 4 seconds
+  // Rotate tips ogni 4 secondi
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTipIndex((prev) => (prev + 1) % tips.length);
@@ -244,7 +284,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
     return () => clearInterval(interval);
   }, [tips.length]);
 
-  // Rotate stats every 3 seconds
+  // Rotate stats ogni 4 secondi
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentStatsIndex((prev) => (prev + 1) % stats.length);
@@ -252,21 +292,37 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
     return () => clearInterval(interval);
   }, [stats.length]);
 
-  // Carica dati e aggiorna su eventi di completamento; ricalcola quando cambia la selezione
+  // Poll system stats ogni 2s
+  useEffect(() => {
+    loadSystemStats();
+    const id = setInterval(() => {
+      loadSystemStats();
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Poll transfer stats ogni 5s e quando cambia la selezione
   useEffect(() => {
     loadRecentTransfers();
-    let unlisten: undefined | (() => void);
+    const id = setInterval(loadRecentTransfers, 5000);
+    return () => clearInterval(id);
+  }, [selectedDeviceKeys.names, selectedDeviceKeys.ips]);
+
+  // Ricarica su transfer_complete event
+  useEffect(() => {
+    let unlistenFn: any;
     (async () => {
       try {
-        unlisten = await listen('transfer_complete', () => {
+        unlistenFn = await listen('transfer_complete', () => {
           loadRecentTransfers();
         });
       } catch {}
     })();
+    
     return () => {
-      if (unlisten) unlisten();
+      if (unlistenFn) unlistenFn();
     };
-  }, [selectedDeviceKeys.names, selectedDeviceKeys.ips]);
+  }, []);
 
   const getTrendColor = (trend?: 'up' | 'down' | 'stable') => {
     switch (trend) {
@@ -351,7 +407,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
             </div>
             
             {/* Mini progress bars for CPU and Memory */}
-            {(stats[currentStatsIndex].title === 'CPU Usage' || stats[currentStatsIndex].title === 'Memory') && (
+            {(stats[currentStatsIndex].key === 'cpu' || stats[currentStatsIndex].key === 'memory') && (
               <Progress 
                 value={parseInt(stats[currentStatsIndex].value)} 
                 className="h-2"

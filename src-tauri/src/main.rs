@@ -3,6 +3,7 @@
 use tauri::Manager;
 
 mod file_transfer;
+use crate::file_transfer::{list_trusted_devices, remove_trusted_device_ip};
 
 use std::{
     sync::{Arc, Mutex},
@@ -13,7 +14,7 @@ use tokio::time;
 use tokio::net::UdpSocket as TokioUdpSocket;
 use serde::{Serialize, Deserialize};
 use chrono::Utc;
-use log::{warn, error};
+use log::{warn, error, debug};
 use get_if_addrs::get_if_addrs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -35,8 +36,6 @@ struct DeviceEntry {
     last_seen_instant: Instant,
 }
 
-
-
 type SharedDevices = Arc<Mutex<Vec<DeviceEntry>>>;
 
 const BROADCAST_PORT: u16 = 40123;
@@ -56,10 +55,58 @@ fn get_local_ip() -> Option<String> {
     None
 }
 
+// ✅ AGGIUNTA: Funzione per normalizzare il nome del dispositivo
+fn normalize_device_name(hostname: &str) -> String {
+    if hostname.is_empty() || hostname == "Unknown" {
+        return "Dispositivo".to_string();
+    }
+    
+    let lower = hostname.to_lowercase();
+    
+    // Se contiene informazioni di tipo, mantienilo
+    if lower.contains("iphone") || lower.contains("ipad") || lower.contains("ios") {
+        return hostname.to_string();
+    }
+    if lower.contains("android") {
+        return hostname.to_string();
+    }
+    if lower.contains("mac") || lower.contains("macbook") || lower.contains("darwin") {
+        return hostname.to_string();
+    }
+    if lower.contains("win") || lower.contains("windows") {
+        return hostname.to_string();
+    }
+    if lower.contains("linux") {
+        return hostname.to_string();
+    }
+    
+    // Altrimenti, se è un nome generico, aggiungi il tipo di device rilevabile
+    #[cfg(target_os = "macos")]
+    {
+        if !lower.contains("mac") && !lower.contains("macbook") {
+            return format!("{} (macOS)", hostname);
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if !lower.contains("win") && !lower.contains("windows") {
+            return format!("{} (Windows)", hostname);
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if !lower.contains("linux") {
+            return format!("{} (Linux)", hostname);
+        }
+    }
+    
+    hostname.to_string()
+}
+
 use tauri_plugin_dialog;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let devices: SharedDevices = Arc::new(Mutex::new(Vec::new()));
 
     tauri::Builder::default()
@@ -98,31 +145,53 @@ async fn main() {
             file_transfer::respond_transfer,
             file_transfer::add_recent_transfer,
             file_transfer::get_recent_transfers,
-            file_transfer::delete_recent_transfer
+            file_transfer::delete_recent_transfer,
+            file_transfer::get_auto_accept_trusted,
+            file_transfer::set_auto_accept_trusted,
+            file_transfer::list_trusted_devices,
+            file_transfer::get_system_stats,
+            file_transfer::get_today_stats,
+            file_transfer::remove_trusted_device_ip
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri app");
+
+    Ok(())
 }
 
+// ✅ MODIFICATA: Funzione per inviare heartbeat con nome normalizzato
 async fn udp_broadcast_heartbeat_loop() {
-    let name = hostname::get()
+    let hostname = hostname::get()
         .map(|h| h.to_string_lossy().to_string())
         .unwrap_or_else(|_| "Unknown".to_string());
+    
+    // ✅ Normalizza il nome del dispositivo
+    let name = normalize_device_name(&hostname);
+    
     let port = BROADCAST_PORT;
     let ip = get_local_ip().unwrap_or_else(|| "0.0.0.0".to_string());
+    
     let device = Device {
-        name,
-        ip,
+        name: name.clone(),  // ✅ Usa il nome normalizzato
+        ip: ip.clone(),
         port,
         status: "Online".to_string(),
         last_seen: Utc::now().to_rfc3339(),
     };
+    
     let socket = TokioUdpSocket::bind(("0.0.0.0", 0)).await.expect("bind failed");
     socket.set_broadcast(true).expect("set broadcast failed");
     let broadcast_addr = SocketAddr::from(([255,255,255,255], BROADCAST_PORT));
+    
+    debug!("[BROADCAST] Avvio heartbeat con nome normalizzato: {}", name);
+    
     loop {
         let mut to_send = device.clone();
         to_send.last_seen = Utc::now().to_rfc3339();
+        
+        // ✅ Log per debug
+        debug!("[BROADCAST] Invio heartbeat: name={}, ip={}, port={}", to_send.name, to_send.ip, to_send.port);
+        
         let json = serde_json::to_string(&to_send).unwrap();
         let _ = socket.send_to(json.as_bytes(), &broadcast_addr).await;
         time::sleep(Duration::from_secs(HEARTBEAT_INTERVAL_SECS)).await;
@@ -156,16 +225,21 @@ async fn udp_listener_loop(devices: SharedDevices) {
                 warn!("Failed to get local IP");
             }
         }
+        
+        debug!("[LISTENER] Ricevuto dispositivo: name={}, ip={}", dev.name, dev.ip);
+        
         let now = Instant::now();
         let mut devs = devices.lock().unwrap();
         if let Some(existing) = devs.iter_mut().find(|d| d.device.ip == dev.ip) {
             existing.device = dev.clone();
             existing.last_seen_instant = now;
+            debug!("[LISTENER] Dispositivo aggiornato: {}", dev.name);
         } else {
             devs.push(DeviceEntry {
                 device: dev.clone(),
                 last_seen_instant: now,
             });
+            debug!("[LISTENER] Nuovo dispositivo aggiunto: {}", dev.name);
         }
     }
 }
@@ -175,7 +249,13 @@ async fn cleanup_loop(devices: SharedDevices) {
         {
             let mut devs = devices.lock().unwrap();
             let now = Instant::now();
+            let before_count = devs.len();
             devs.retain(|entry| now.duration_since(entry.last_seen_instant).as_secs() < DEVICE_TIMEOUT_SECS);
+            let after_count = devs.len();
+            
+            if before_count != after_count {
+                debug!("[CLEANUP] Rimossi {} dispositivi inattivi", before_count - after_count);
+            }
         }
         time::sleep(Duration::from_secs(1)).await;
     }
@@ -184,7 +264,14 @@ async fn cleanup_loop(devices: SharedDevices) {
 #[tauri::command]
 fn get_devices(devices: tauri::State<'_, SharedDevices>) -> Vec<Device> {
     let devs = devices.lock().unwrap();
-    devs.iter().map(|entry| entry.device.clone()).collect()
+    let device_list: Vec<Device> = devs.iter().map(|entry| entry.device.clone()).collect();
+    
+    debug!("[GET_DEVICES] Ritornando {} dispositivi", device_list.len());
+    for device in &device_list {
+        debug!("[GET_DEVICES] - {}: {}", device.name, device.ip);
+    }
+    
+    device_list
 }
 
 #[tauri::command]
@@ -248,3 +335,4 @@ async fn send_file_with_progress(
         Err(e) => Err(e.to_string()),
     }
 }
+

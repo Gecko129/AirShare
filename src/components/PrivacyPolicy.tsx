@@ -8,7 +8,7 @@ export default function PrivacyPolicy() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
         <h2>{t('privacy.title')}</h2>
-        <span>{t('privacy.last_updated', { date: '29 ottobre 2025' })}</span>
+        <span>{t('privacy.last_updated', { date: '29/10/2025' })}</span>
         </div>
 
         <main className="space-y-6">

@@ -50,6 +50,7 @@
   "settings.auto_accept_desc": "Accetta automaticamente file da dispositivi fidati",
   "settings.security": "Sicurezza",
   "settings.manage_trusted_devices": "Gestisci dispositivi fidati",
+  "trust_device_checkbox": "Ricorda e considera attendibile questo dispositivo",
   "settings.info": "Informazioni",
   "settings.version": "Versione",
   "settings.build": "Build",

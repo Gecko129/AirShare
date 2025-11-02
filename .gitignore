@@ -26,4 +26,8 @@ dist-ssr
 # Roba strana
 out
 public
+<<<<<<< HEAD
 target 
+=======
+target 
+>>>>>>> a4081d0 (feat: add AutoAcceptNotification component for real-time transfer notifications)

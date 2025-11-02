@@ -15,6 +15,7 @@ use tauri_plugin_dialog::DialogExt;
 use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex as TokioMutex;
+use sysinfo::System;
 
 // Global shared state for transfer responses
 static TRANSFER_RESPONSES: Lazy<TokioMutex<HashMap<String, bool>>> = Lazy::new(|| TokioMutex::new(HashMap::new()));
@@ -29,15 +30,124 @@ pub struct RespondTransferArgs {
     #[serde(alias = "transfer_id")]
     pub transfer_id: String,
     pub accept: bool,
+    #[serde(default)]
+    pub trust: Option<bool>,
 }
+
+// Map transfer_id -> ip for later trust decisions
+static TRANSFER_IPS: Lazy<TokioMutex<HashMap<String, String>>> = Lazy::new(|| TokioMutex::new(HashMap::new()));
 
 #[tauri::command]
 pub async fn respond_transfer(args: RespondTransferArgs) {
-    let mut map = TRANSFER_RESPONSES.lock().await;
-    map.insert(args.transfer_id, args.accept);
+    // store user accept/deny decision
+    {
+        let mut map = TRANSFER_RESPONSES.lock().await;
+        map.insert(args.transfer_id.clone(), args.accept);
+    }
+    // if user opted to trust, persist sender ip
+    if args.accept {
+        if let Some(true) = args.trust {
+            if let Some(ip) = {
+                let map = TRANSFER_IPS.lock().await;
+                map.get(&args.transfer_id).cloned()
+            } {
+                let _ = add_trusted_device_ip(&ip).await;
+            }
+        }
+    }
 }
 use dirs;
 use tauri::AppHandle;
+
+// --- Settings and Trusted Devices Persistence ---
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct AppSettings {
+    #[serde(default)]
+    auto_accept_trusted: bool,
+}
+
+async fn app_data_dir() -> anyhow::Result<PathBuf> {
+    let mut dir = dirs::data_dir().ok_or_else(|| anyhow::anyhow!("impossibile ottenere data_dir"))?;
+    dir.push("AirShare");
+    if !dir.exists() {
+        tokio::fs::create_dir_all(&dir).await?;
+    }
+    Ok(dir)
+}
+
+async fn settings_path() -> anyhow::Result<PathBuf> { Ok(app_data_dir().await?.join("settings.json")) }
+async fn trusted_devices_path() -> anyhow::Result<PathBuf> { Ok(app_data_dir().await?.join("trusted_devices.json")) }
+
+async fn read_settings() -> AppSettings {
+    match settings_path().await.and_then(|p| Ok(p)) {
+        Ok(p) => match tokio::fs::read(&p).await {
+            Ok(bytes) if !bytes.is_empty() => serde_json::from_slice(&bytes).unwrap_or_default(),
+            _ => AppSettings::default(),
+        },
+        Err(_) => AppSettings::default(),
+    }
+}
+
+async fn write_settings(s: &AppSettings) -> anyhow::Result<()> {
+    let p = settings_path().await?;
+    let tmp = p.with_extension("json.tmp");
+    let bytes = serde_json::to_vec_pretty(s)?;
+    tokio::fs::write(&tmp, &bytes).await?;
+    tokio::fs::rename(&tmp, &p).await?;
+    Ok(())
+}
+
+async fn read_trusted_ips() -> Vec<String> {
+    match trusted_devices_path().await.and_then(|p| Ok(p)) {
+        Ok(p) => match tokio::fs::read(&p).await {
+            Ok(bytes) if !bytes.is_empty() => serde_json::from_slice(&bytes).unwrap_or_else(|_| Vec::new()),
+            _ => Vec::new(),
+        },
+        Err(_) => Vec::new(),
+    }
+}
+
+async fn write_trusted_ips(list: &Vec<String>) -> anyhow::Result<()> {
+    let p = trusted_devices_path().await?;
+    let tmp = p.with_extension("json.tmp");
+    let bytes = serde_json::to_vec_pretty(list)?;
+    tokio::fs::write(&tmp, &bytes).await?;
+    tokio::fs::rename(&tmp, &p).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_auto_accept_trusted() -> Result<bool, String> {
+    Ok(read_settings().await.auto_accept_trusted)
+}
+
+#[tauri::command]
+pub async fn set_auto_accept_trusted(value: bool) -> Result<(), String> {
+    let mut s = read_settings().await;
+    s.auto_accept_trusted = value;
+    write_settings(&s).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_trusted_devices() -> Result<Vec<String>, String> {
+    Ok(read_trusted_ips().await)
+}
+
+pub async fn add_trusted_device_ip(ip: &str) -> Result<(), String> {
+    let mut list = read_trusted_ips().await;
+    if !list.iter().any(|x| x == ip) {
+        list.push(ip.to_string());
+        write_trusted_ips(&list).await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_trusted_device_ip(ip: String) -> Result<(), String> {
+    let mut list = read_trusted_ips().await;
+    list.retain(|x| x != &ip);
+    write_trusted_ips(&list).await.map_err(|e| e.to_string())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileOffer {
@@ -420,104 +530,216 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             // Emit the full header JSON line to the frontend for debugging
             tauri_log(&app_handle, "debug", format!("[RECV] Full FileOffer JSON: {}", header_str)).await;
             // Determine batch_id (use transfer_id if not present)
-            let batch_id = offer.batch_id.clone().unwrap_or_else(|| offer.transfer_id.clone());
-            info!("({addr}) Parsed file offer: {:?}, batch_id: {}", offer, batch_id);
-            tauri_log(&app_handle, "info", format!("Parsed file offer from {}: {} ({} bytes)", addr, offer.file_name, offer.file_size)).await;
+            // Determine batch_id (use transfer_id if not present)
+let batch_id = offer.batch_id.clone().unwrap_or_else(|| offer.transfer_id.clone());
+info!("({addr}) Parsed file offer: {:?}, batch_id: {}", offer, batch_id);
+tauri_log(&app_handle, "info", format!("Parsed file offer from {}: {} ({} bytes)", addr, offer.file_name, offer.file_size)).await;
 
-            let transfer_id = offer.transfer_id.clone();
-            let mut accept: bool;
-            let mut save_dir: Option<PathBuf>;
-            let mut is_batch_first = false;
-            // --- PATCH: Check BATCH_RESPONSES with exact batch_id before asking frontend ---
-            {
-                let map = BATCH_RESPONSES.lock().await;
-                if let Some((a, d)) = map.get(&batch_id) {
-                    info!("({addr}) [BATCH] Existing batch_id {} found. Reusing accept/dir for new connection.", batch_id);
-                    tauri_log(&app_handle, "info", format!("[BATCH] Existing batch_id {} found. Reusing accept/dir for new connection from {}.", batch_id, addr)).await;
-                    accept = *a;
-                    save_dir = d.clone();
-                } else {
-                    info!("({addr}) [BATCH] No entry for batch_id {}. Asking user for confirmation/folder.", batch_id);
-                    tauri_log(&app_handle, "info", format!("[BATCH] No entry for batch_id {}. Asking user for confirmation/folder from {}.", batch_id, addr)).await;
-                    is_batch_first = true;
-                    accept = false; // to be set below
-                    save_dir = None;
-                }
+let transfer_id = offer.transfer_id.clone();
+// Record transfer -> ip for potential trust saving
+{
+    let mut tmap = TRANSFER_IPS.lock().await;
+    tmap.insert(transfer_id.clone(), addr.ip().to_string());
+}
+
+let mut accept: bool;
+let mut save_dir: Option<PathBuf>;
+let mut is_batch_first = false;
+
+// Check if we already have a batch response
+{
+    let map = BATCH_RESPONSES.lock().await;
+    if let Some((a, d)) = map.get(&batch_id) {
+        info!("({addr}) [BATCH] Existing batch_id {} found. Reusing accept/dir for new connection.", batch_id);
+        tauri_log(&app_handle, "info", format!("[BATCH] Existing batch_id {} found. Reusing accept/dir for new connection from {}.", batch_id, addr)).await;
+        accept = *a;
+        save_dir = d.clone();
+    } else {
+        info!("({addr}) [BATCH] No entry for batch_id {}. Checking auto-accept/trust or asking user.", batch_id);
+        tauri_log(&app_handle, "info", format!("[BATCH] No entry for batch_id {}. Checking auto-accept/trust or asking user from {}.", batch_id, addr)).await;
+        is_batch_first = true;
+        accept = false;
+        save_dir = None;
+    }
+}
+
+if is_batch_first {
+    // Check if auto-accept is enabled and IP is trusted
+    let ip_str = addr.ip().to_string();
+    let auto_enabled = read_settings().await.auto_accept_trusted;
+    let trusted = read_trusted_ips().await;
+    let should_auto_accept = auto_enabled && trusted.iter().any(|x| x == &ip_str);
+
+    if should_auto_accept {
+        info!("({addr}) ✅ Auto-accept enabled for trusted IP: {}", ip_str);
+        tauri_log(&app_handle, "info", format!("✅ Auto-accept enabled for trusted IP: {}", ip_str)).await;
+        
+        accept = true;
+        
+        // Emit notification event to frontend
+        let _ = app_handle.emit(
+            "transfer_auto_accepted",
+            serde_json::json!({
+                "transfer_id": transfer_id,
+                "file_name": offer.file_name,
+                "file_size": offer.file_size,
+                "ip": ip_str,
+                "device_name": ip_str.clone(),
+            }),
+        );
+        
+        // Ask only for destination folder
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+        let save_dir_result: Arc<Mutex<Option<PathBuf>>> = Arc::new(Mutex::new(None));
+        let save_dir_clone = save_dir_result.clone();
+        
+        FileDialogBuilder::new(app_handle.dialog().clone())
+            .set_title("Scegli la cartella di destinazione per il file dal dispositivo fidato")
+            .pick_folder(move |path| {
+                let save_dir_clone = save_dir_clone.clone();
+                tauri::async_runtime::spawn(async move {
+                    let mut result = save_dir_clone.lock().await;
+                    *result = path.and_then(|p| p.as_path().map(|path| PathBuf::from(path)));
+                });
+            });
+        
+        info!("({addr}) Auto-accept: Waiting for user to select destination folder...");
+        tauri_log(&app_handle, "info", format!("Auto-accept: Waiting for destination folder selection for {}", ip_str)).await;
+        
+        // Wait for folder selection with timeout
+        let timeout_duration = tokio::time::Duration::from_secs(300); // 5 minuti timeout
+        let start_time = tokio::time::Instant::now();
+        
+        let chosen_dir = loop {
+            if start_time.elapsed() > timeout_duration {
+                error!("({addr}) Timeout waiting for folder selection");
+                tauri_log(&app_handle, "error", format!("Timeout waiting for folder selection from {}", addr)).await;
+                
+                // Send rejection
+                let nack = serde_json::json!({ "accept": false, "error": "timeout_folder_selection" });
+                let nack_str = serde_json::to_string(&nack).unwrap() + "\n";
+                let _ = socket.write_all(nack_str.as_bytes()).await;
+                let _ = socket.flush().await;
+                return;
             }
-            if is_batch_first {
-                // Emit event to frontend (include source address info)
-                info!("({addr}) Emitting transfer_request event for batch_id: {}", batch_id);
-                tauri_log(&app_handle, "info", format!("Emitting transfer_request for {} from {}", transfer_id, addr)).await;
-                let _ = app_handle.emit(
-                    "transfer_request",
-                    serde_json::json!({
-                        "offer": offer,
-                        "ip": addr.ip().to_string(),
-                        "port": addr.port(),
-                        "direction": "receive"
-                    }),
-                );
-                info!("({addr}) Waiting for user confirmation for transfer_id: {}", transfer_id);
-                tauri_log(&app_handle, "info", format!("Waiting for user confirmation for transfer_id: {}", transfer_id)).await;
-                // Wait for user response
-                accept = loop {
-                    let map = TRANSFER_RESPONSES.lock().await;
-                    if let Some(&a) = map.get(&transfer_id) {
-                        break a;
-                    }
-                    drop(map);
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                };
-                info!("({addr}) User responded with accept = {} for transfer_id: {}", accept, transfer_id);
-                tauri_log(&app_handle, "info", format!("User responded with accept = {} for transfer_id: {}", accept, transfer_id)).await;
-                // Remove transfer_id from TRANSFER_RESPONSES
-                {
-                    let mut map = TRANSFER_RESPONSES.lock().await;
-                    map.remove(&transfer_id);
-                }
-                // If accepted, ask for folder
-                if accept {
-                    use std::sync::Arc;
-                    use tokio::sync::Mutex;
-                    let save_dir_result: Arc<Mutex<Option<PathBuf>>> = Arc::new(Mutex::new(None));
-                    let save_dir_clone = save_dir_result.clone();
-                    FileDialogBuilder::new(app_handle.dialog().clone())
-                        .set_title("Scegli la cartella di destinazione per il file")
-                        .pick_folder(move |path| {
-                            let save_dir_clone = save_dir_clone.clone();
-                            tauri::async_runtime::spawn(async move {
-                                let mut result = save_dir_clone.lock().await;
-                                *result = path.and_then(|p| p.as_path().map(|path| PathBuf::from(path)));
-                            });
-                        });
-                    info!("({addr}) Waiting for user to select destination folder for batch_id: {}", batch_id);
-                    tauri_log(&app_handle, "info", format!("Waiting for user to select destination folder for batch_id: {}", batch_id)).await;
-                    // Aspetta che l'utente selezioni una cartella (con timeout)
-                    let chosen_dir = loop {
-                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                        let result = save_dir_result.lock().await;
-                        if result.is_some() {
-                            break result.clone();
-                        }
-                    };
-                    save_dir = chosen_dir;
-                    info!("({addr}) User selected destination folder for batch_id: {}: {:?}", batch_id, save_dir);
-                    tauri_log(&app_handle, "info", format!("User selected destination folder for batch_id: {}: {:?}", batch_id, save_dir)).await;
-                }
-                // Save to BATCH_RESPONSES (even if rejected, to avoid repeated asks)
-                {
-                    let mut map = BATCH_RESPONSES.lock().await;
-                    map.insert(batch_id.clone(), (accept, save_dir.clone()));
-                    info!("({addr}) [BATCH] Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir);
-                    tauri_log(&app_handle, "info", format!("[BATCH] Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir)).await;
-                }
+            
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            let result = save_dir_result.lock().await;
+            if result.is_some() {
+                break result.clone();
             }
-            // Send ack JSON (expanded for potential error reporting)
-            let ack = if accept {
-                serde_json::json!({ "accept": true })
+        };
+        
+        save_dir = chosen_dir;
+        
+        if save_dir.is_none() {
+            info!("({addr}) User cancelled folder selection for auto-accepted transfer");
+            tauri_log(&app_handle, "info", format!("User cancelled folder selection for auto-accepted transfer from {}", addr)).await;
+            
+            // Send rejection
+            let nack = serde_json::json!({ "accept": false, "error": "user_cancelled_folder" });
+            let nack_str = serde_json::to_string(&nack).unwrap() + "\n";
+            if let Err(e) = socket.write_all(nack_str.as_bytes()).await {
+                error!("({addr}) Failed to write cancellation ack: {}", e);
             } else {
-                serde_json::json!({ "accept": false, "error": "user_rejected" })
+                let _ = socket.flush().await;
+            }
+            return;
+        }
+        
+        // Save to BATCH_RESPONSES
+        {
+            let mut map = BATCH_RESPONSES.lock().await;
+            map.insert(batch_id.clone(), (accept, save_dir.clone()));
+            info!("({addr}) [BATCH] Saved batch_id {} to BATCH_RESPONSES with accept = true (auto-accept) and save_dir = {:?}", batch_id, save_dir);
+            tauri_log(&app_handle, "info", format!("[BATCH] Saved batch_id {} to BATCH_RESPONSES (auto-accept)", batch_id)).await;
+        }
+    } else {
+        // NOT auto-accept: show normal prompt
+        info!("({addr}) Auto-accept disabled or IP not trusted. Showing normal prompt.");
+        tauri_log(&app_handle, "info", format!("Auto-accept disabled or IP not trusted for {}. Showing prompt.", addr.ip())).await;
+        
+        // Emit event to frontend (include source address info)
+        info!("({addr}) Emitting transfer_request event for batch_id: {}", batch_id);
+        tauri_log(&app_handle, "info", format!("Emitting transfer_request for {} from {}", transfer_id, addr)).await;
+        let _ = app_handle.emit(
+            "transfer_request",
+            serde_json::json!({
+                "offer": offer,
+                "ip": addr.ip().to_string(),
+                "port": addr.port(),
+                "direction": "receive"
+            }),
+        );
+        info!("({addr}) Waiting for user confirmation for transfer_id: {}", transfer_id);
+        tauri_log(&app_handle, "info", format!("Waiting for user confirmation for transfer_id: {}", transfer_id)).await;
+        
+        // Wait for user response
+        accept = loop {
+            let map = TRANSFER_RESPONSES.lock().await;
+            if let Some(&a) = map.get(&transfer_id) {
+                break a;
+            }
+            drop(map);
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        };
+        
+        info!("({addr}) User responded with accept = {} for transfer_id: {}", accept, transfer_id);
+        tauri_log(&app_handle, "info", format!("User responded with accept = {} for transfer_id: {}", accept, transfer_id)).await;
+        
+        // Remove transfer_id from TRANSFER_RESPONSES
+        {
+            let mut map = TRANSFER_RESPONSES.lock().await;
+            map.remove(&transfer_id);
+        }
+        
+        // If accepted, ask for folder
+        if accept {
+            use std::sync::Arc;
+            use tokio::sync::Mutex;
+            let save_dir_result: Arc<Mutex<Option<PathBuf>>> = Arc::new(Mutex::new(None));
+            let save_dir_clone = save_dir_result.clone();
+            FileDialogBuilder::new(app_handle.dialog().clone())
+                .set_title("Scegli la cartella di destinazione per il file")
+                .pick_folder(move |path| {
+                    let save_dir_clone = save_dir_clone.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let mut result = save_dir_clone.lock().await;
+                        *result = path.and_then(|p| p.as_path().map(|path| PathBuf::from(path)));
+                    });
+                });
+            info!("({addr}) Waiting for user to select destination folder for batch_id: {}", batch_id);
+            tauri_log(&app_handle, "info", format!("Waiting for user to select destination folder for batch_id: {}", batch_id)).await;
+            
+            let chosen_dir = loop {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                let result = save_dir_result.lock().await;
+                if result.is_some() {
+                    break result.clone();
+                }
             };
+            save_dir = chosen_dir;
+            info!("({addr}) User selected destination folder for batch_id: {}: {:?}", batch_id, save_dir);
+            tauri_log(&app_handle, "info", format!("User selected destination folder for batch_id: {}: {:?}", batch_id, save_dir)).await;
+        }
+        
+        // Save to BATCH_RESPONSES (even if rejected, to avoid repeated asks)
+        {
+            let mut map = BATCH_RESPONSES.lock().await;
+            map.insert(batch_id.clone(), (accept, save_dir.clone()));
+            info!("({addr}) [BATCH] Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir);
+            tauri_log(&app_handle, "info", format!("[BATCH] Saved batch_id {} to BATCH_RESPONSES with accept = {} and save_dir = {:?}", batch_id, accept, save_dir)).await;
+        }
+    }
+}
+
+// Send ack JSON
+let ack = if accept {
+    serde_json::json!({ "accept": true })
+} else {
+    serde_json::json!({ "accept": false, "error": "user_rejected" })
+};
             let ack_str = serde_json::to_string(&ack).unwrap() + "\n";
             match socket.write_all(ack_str.as_bytes()).await {
                 Ok(_) => {
@@ -1177,4 +1399,107 @@ pub async fn send_file_with_progress(
 
     // Funzione di dialogo rimossa come richiesto
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_system_stats() -> Result<serde_json::Value, String> {
+    use std::thread;
+    use std::time::Duration;
+    
+    let mut sys = System::new_all();
+    
+    // Prima misurazione (baseline)
+    sys.refresh_cpu();
+    
+    // Attendi un breve intervallo (200ms è sufficiente)
+    thread::sleep(Duration::from_millis(200));
+    
+    // Seconda misurazione per ottenere l'uso effettivo
+    sys.refresh_cpu();
+    sys.refresh_memory();
+    
+    // CPU usage globale (0.0 .. 100.0)
+    let cpu = sys.global_cpu_info().cpu_usage();
+    
+    // Memoria: used / total
+    let total = sys.total_memory() as f32;
+    let used = sys.used_memory() as f32;
+    let mem_percent = if total > 0.0 { (used / total) * 100.0 } else { 0.0 };
+    
+    Ok(serde_json::json!({
+        "cpu": (cpu * 10.0).round() / 10.0,
+        "memory": (mem_percent * 10.0).round() / 10.0
+    }))
+}
+
+use chrono::Local;
+// helper: controlla se una data (rfc3339) è "oggi"
+fn datetime_is_today(s: &str) -> bool {
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
+        // Converti a timezone locale
+        let dt_local = dt.with_timezone(&Local).date_naive();
+        let today = Local::now().date_naive();
+        return dt_local == today;
+    }
+    false
+}
+
+#[tauri::command]
+pub async fn get_today_stats(
+    selected_names: Option<Vec<String>>,
+    selected_ips: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
+    // Leggi i recent transfers file (se non esiste restituisci zero)
+    let mut path = dirs::data_dir().ok_or_else(|| "impossibile ottenere data_dir".to_string())?;
+    path.push("AirShare");
+    path.push("recent_transfers.json");
+    let bytes = match tokio::fs::read(&path).await {
+        Ok(b) => b,
+        Err(_) => Vec::new(),
+    };
+    let records: Vec<TransferRecord> = if bytes.is_empty() {
+        Vec::new()
+    } else {
+        match serde_json::from_slice::<Vec<TransferRecord>>(&bytes) {
+            Ok(v) => v,
+            Err(_) => Vec::new(),
+        }
+    };
+
+    // Prepara set di filtri (se forniti)
+    let names_set: std::collections::HashSet<String> = selected_names.unwrap_or_default().into_iter().collect();
+    let ips_set: std::collections::HashSet<String> = selected_ips.unwrap_or_default().into_iter().collect();
+    let filter_by_selection = !(names_set.is_empty() && ips_set.is_empty());
+
+    // Filtra i record per "oggi" e per selezione (se richiesta)
+    let relevant: Vec<&TransferRecord> = records.iter()
+        .filter(|r| datetime_is_today(&r.start_time))
+        .filter(|r| {
+            if !filter_by_selection {
+                return true;
+            }
+            let from = r.from_device.to_string();
+            let to = r.to_device.to_string();
+            names_set.contains(&from) || names_set.contains(&to) || 
+            ips_set.contains(&from) || ips_set.contains(&to)
+        })
+        .collect();
+
+    // Considera solo completati
+    let completed: Vec<&&TransferRecord> = relevant.iter()
+        .filter(|r| matches!(r.status, TransferStatus::Completed))
+        .collect();
+    
+    let count = completed.len();
+    let avg_speed = if count > 0 {
+        let sum: f64 = completed.iter().map(|r| r.speed).sum();
+        (sum / count as f64 * 10.0).round() / 10.0
+    } else {
+        0.0
+    };
+
+    Ok(serde_json::json!({
+        "transfers_today": count,
+        "avg_speed": avg_speed
+    }))
 }
