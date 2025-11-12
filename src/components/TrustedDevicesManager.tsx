@@ -52,10 +52,10 @@ export function TrustedDevicesManager({ open, onOpenChange }: TrustedDevicesMana
     }
   }, [open]);
 
-  const handleRemoveDevice = async (ip: string) => {
+  const handleRemoveDevice = async (mac: string) => {
     try {
-      await invoke('remove_trusted_device_ip', { ip });
-      setTrustedDevices(prev => prev.filter(device => device !== ip));
+      await invoke('remove_trusted_device_mac', { mac });
+      setTrustedDevices(prev => prev.filter(device => device !== mac));
       setDeviceToRemove(null);
     } catch (error) {
       console.error('Errore nella rimozione del dispositivo:', error);
@@ -63,30 +63,54 @@ export function TrustedDevicesManager({ open, onOpenChange }: TrustedDevicesMana
   };
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            {t('settings.trusted_devices_title', 'Dispositivi Fidati')}
+  <>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        style={{
+          background: "#fefefe",
+          color: "#1e1e1e",
+          boxShadow: "0 2px 16px rgba(0,0,0,0.1)",
+          border: "1px solid #ddd",
+        }}
+        className="sm:max-w-md"
+      >
+        <DialogHeader
+          style={{ background: "transparent" }}
+        >
+          <DialogTitle
+            style={{
+              color: "#111",
+              background: "transparent",
+              fontWeight: 600,
+              fontFamily: "inherit",
+            }}
+            className="flex items-center gap-2"
+          >
+            <Shield className="w-5 h-5 text-gray-900" />
+            {t("settings.trusted_devices_title")}
           </DialogTitle>
-          <DialogDescription>
-            {t('settings.trusted_devices_desc', 'Gestisci i dispositivi che possono inviare file senza conferma')}
+          <DialogDescription
+            style={{
+              color: "#555",
+              background: "transparent",
+            }}
+            className="text-sm"
+          >
+            {t("settings.trusted_devices_desc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4">
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              {t('settings.loading', 'Caricamento...')}
+            <div className="text-center py-8" style={{ color: "#777" }}>
+              {t("settings.loading")}
             </div>
           ) : trustedDevices.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Shield className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>{t('settings.no_trusted_devices', 'Nessun dispositivo fidato')}</p>
-              <p className="text-sm mt-1">
-                {t('settings.no_trusted_devices_hint', 'Accetta un trasferimento e seleziona "Ricorda dispositivo"')}
+            <div className="text-center py-8" style={{ color: "#777" }}>
+              <Shield className="w-12 h-12 mx-auto mb-2 opacity-50 text-gray-500" />
+              <p style={{ color: "#1e1e1e" }}>{t("settings.no_trusted_devices")}</p>
+              <p className="text-sm mt-1" style={{ color: "#666" }}>
+                {t("settings.no_trusted_devices_hint")}
               </p>
             </div>
           ) : (
@@ -94,16 +118,30 @@ export function TrustedDevicesManager({ open, onOpenChange }: TrustedDevicesMana
               {trustedDevices.map((device) => (
                 <div
                   key={device}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-lg border transition-colors"
+                  style={{
+                    backgroundColor: "#fafafa",
+                    borderColor: "#ddd",
+                    cursor: "default",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.backgroundColor = "#e6f0ff";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.backgroundColor = "#fafafa";
+                  }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-primary" />
+                    <div
+                      style={{ backgroundColor: "#dbeafe" }}
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                    >
+                      <Shield className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <p className="font-medium">{device}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t('settings.trusted_device_ip', 'Indirizzo IP')}
+                      <p style={{ color: "#1e1e1e", fontWeight: 500 }}>{device}</p>
+                      <p className="text-xs" style={{ color: "#666" }}>
+                        {t("mac_label")}
                       </p>
                     </div>
                   </div>
@@ -111,7 +149,7 @@ export function TrustedDevicesManager({ open, onOpenChange }: TrustedDevicesMana
                     variant="ghost"
                     size="icon"
                     onClick={() => setDeviceToRemove(device)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -122,9 +160,24 @@ export function TrustedDevicesManager({ open, onOpenChange }: TrustedDevicesMana
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            style={{
+              background: "#fff",
+              color: "#1e1e1e",
+              borderColor: "#ddd",
+              transition: "background-color 0.2s",
+            }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "#f0f0f0")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLButtonElement).style.backgroundColor = "#fff")
+            }
+          >
             <X className="w-4 h-4 mr-2" />
-            {t('settings.close', 'Chiudi')}
+            {t("settings.close")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -132,31 +185,65 @@ export function TrustedDevicesManager({ open, onOpenChange }: TrustedDevicesMana
 
     {/* Conferma rimozione */}
     <AlertDialog open={!!deviceToRemove} onOpenChange={() => setDeviceToRemove(null)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-destructive" />
-            {t('settings.remove_device_title', 'Rimuovi dispositivo fidato')}
+      <AlertDialogContent
+        style={{
+          background: "#fefefe",
+          color: "#1e1e1e",
+          boxShadow: "0 2px 16px rgba(0,0,0,0.1)",
+          border: "1px solid #ddd",
+        }}
+      >
+        <AlertDialogHeader
+          style={{ background: "transparent" }}
+        >
+          <AlertDialogTitle
+            style={{ color: "#b91c1c", background: "transparent" }}
+            className="flex items-center gap-2"
+          >
+            <AlertCircle className="w-5 h-5" />
+            {t("settings.remove_device_title")}
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t('settings.remove_device_desc', 'Sei sicuro di voler rimuovere questo dispositivo dalla lista dei fidati?')}
+          <AlertDialogDescription
+            style={{ color: "#555", background: "transparent" }}
+          >
+            {t("settings.remove_device_desc")}
             <br />
-            <span className="font-mono text-sm mt-2 block">{deviceToRemove}</span>
+            <span className="font-mono text-sm mt-2 block" style={{ color: "#333" }}>
+              {deviceToRemove}
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setDeviceToRemove(null)}>
-            {t('settings.cancel', 'Annulla')}
+          <AlertDialogCancel
+            onClick={() => setDeviceToRemove(null)}
+            style={{
+              background: "#fff",
+              color: "#1e1e1e",
+              border: "1px solid #ddd",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#fff")}
+          >
+            {t("settings.cancel")}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={() => deviceToRemove && handleRemoveDevice(deviceToRemove)}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            style={{
+              background: "#b91c1c",
+              color: "#fff",
+              border: "1px solid #7f1d1d",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#991b1b")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#b91c1c")}
           >
-            {t('settings.remove', 'Rimuovi')}
+            {t("settings.remove")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   </>
-  );
+);
+
+
+
 }

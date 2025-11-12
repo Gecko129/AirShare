@@ -3,7 +3,7 @@
 use tauri::Manager;
 
 mod file_transfer;
-use crate::file_transfer::{list_trusted_devices, remove_trusted_device_ip};
+use crate::file_transfer::{list_trusted_devices};
 
 use std::{
     sync::{Arc, Mutex},
@@ -20,6 +20,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use std::path::Path;
 use tauri::Emitter;
+use mac_address::get_mac_address;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Device {
@@ -28,6 +29,8 @@ struct Device {
     port: u16,
     status: String,
     last_seen: String,
+    #[serde(default)]
+    mac: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -151,8 +154,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             file_transfer::list_trusted_devices,
             file_transfer::get_system_stats,
             file_transfer::get_today_stats,
-            file_transfer::remove_trusted_device_ip
-        ])
+            file_transfer::add_trusted_device_mac,
+            file_transfer::remove_trusted_device_mac
+         ])
         .run(tauri::generate_context!())
         .expect("error running tauri app");
 
@@ -171,12 +175,19 @@ async fn udp_broadcast_heartbeat_loop() {
     let port = BROADCAST_PORT;
     let ip = get_local_ip().unwrap_or_else(|| "0.0.0.0".to_string());
     
+    // get local MAC (optional)
+    let mac = match get_mac_address() {
+        Ok(Some(ma)) => Some(format!("{}", ma).to_lowercase()),
+        _ => None,
+    };
+
     let device = Device {
         name: name.clone(),  // ✅ Usa il nome normalizzato
         ip: ip.clone(),
         port,
         status: "Online".to_string(),
         last_seen: Utc::now().to_rfc3339(),
+        mac: mac.clone(),
     };
     
     let socket = TokioUdpSocket::bind(("0.0.0.0", 0)).await.expect("bind failed");

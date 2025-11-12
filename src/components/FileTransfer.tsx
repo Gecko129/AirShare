@@ -266,7 +266,7 @@ export function FileTransfer({
   };
 
   const handleFileDialog = async () => {
-    console.log("Apertura finestra di dialogo file");
+    console.log(t('file_dialog_opening'));
     const selected = await open({ multiple: true });
     if (!selected) return;
 
@@ -369,7 +369,7 @@ export function FileTransfer({
           const f = selectedFiles[i];
           const filePath = f.path || f.name;
           if (!f.path) {
-            console.warn('⚠️ [FileTransfer] Path mancante per', f.name, '- prova a selezionare tramite pulsante Seleziona file');
+            console.warn('⚠️ [FileTransfer] Path mancante per', f.name, '-', t('select_file_button_hint'));
           }
 
           console.log(
@@ -444,9 +444,9 @@ export function FileTransfer({
   };
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return `0 ${t('size_units.bytes')}`;
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = [t('size_units.bytes'), t('size_units.kb'), t('size_units.mb'), t('size_units.gb')];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
@@ -486,16 +486,16 @@ export function FileTransfer({
                 const device = foundDevice as Device;
                 ip = device.ip;
                 port = typeof device.port === "string" ? parseInt(device.port, 10) || 40124 : device.port ?? 40124;
-                name = device.name ?? "Dispositivo";
+                name = device.name ?? t('device.default_name');
               } else if (typeof deviceId === 'string' && deviceId.includes(':')) {
                 const [parsedIp, parsedPort] = deviceId.split(':');
                 ip = parsedIp;
                 port = parseInt(parsedPort, 10) || 40124;
-                name = "Dispositivo";
+                name = t('device.default_name');
               } else {
                 ip = String(deviceId);
                 port = 40124;
-                name = "Dispositivo";
+                name = t('device.default_name');
               }
               const key = `${ip}:${port}`;
 

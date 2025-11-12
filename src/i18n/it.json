@@ -106,8 +106,7 @@
   "sidebar.tips.settings.title": "Impostazioni",
   "sidebar.tips.settings.item1": "Diverse opzioni di lingua",
   "sidebar.tips.settings.item2": "Scorciatoie rapide",
-  "sidebar.tips.settings.item3": "Notifiche smart"
-  ,
+  "sidebar.tips.settings.item3": "Notifiche smart",
   "common.cancel": "Annulla",
   "common.confirm": "Conferma",
   "history.title": "Cronologia Trasferimenti",
@@ -234,5 +233,27 @@
   "terms.sections.9.title": "9. Durata e risoluzione",
   "terms.sections.9.body": "I presenti Termini sono validi dalla data di accettazione e rimangono in vigore fino alla cessazione dell’uso dell’Applicazione. L’utente può interrompere l’utilizzo dell’Applicazione in qualsiasi momento; AirShare si riserva il diritto di sospendere o cessare l’accesso in caso di violazione grave o reiterata dei Termini.",
   "terms.sections.10.title": "10. Legge applicabile e foro competente",
-  "terms.sections.10.body": "I presenti Termini sono regolati dalla legge italiana. Per qualsiasi controversia relativa all’interpretazione o esecuzione dei Termini sarà competente in via esclusiva il Foro di Padova, salvo diverse disposizioni inderogabili di legge."
+  "terms.sections.10.body": "I presenti Termini sono regolati dalla legge italiana. Per qualsiasi controversia relativa all’interpretazione o esecuzione dei Termini sarà competente in via esclusiva il Foro di Padova, salvo diverse disposizioni inderogabili di legge.",
+  "file_dialog_opening": "Apertura finestra di dialogo file",
+  "select_file_button_hint": "Prova a selezionare tramite il pulsante Seleziona file",
+  "device.default_name": "Dispositivo",
+  "size_units": {
+    "bytes": "Bytes",
+    "kb": "KB",
+    "mb": "MB",
+    "gb": "GB"
+  },
+  "settings.close": "Chiudi",
+  "settings.loading": "Caricamento...",
+  "settings.trusted_devices_title": "Dispositivi Fidati",
+  "settings.trusted_devices_desc": "Gestisci i dispositivi che possono inviare file senza conferma",
+  "settings.remove_device_title": "Rimuovi dispositivo fidato",
+  "settings.remove_device_desc": "Sei sicuro di voler rimuovere questo dispositivo dalla lista dei fidati?",
+  "settings.cancel": "Annulla",
+  "settings.remove": "Rimuovi",
+  "settings.no_trusted_devices": "Nessun dispositivo fidato ancora aggiunto.",
+  "settings.no_trusted_devices_hint": "I dispositivi che accettano automaticamente i file appariranno qui.",
+  "notifications.auto_accepted_title": "Trasferimento Auto-Accettato",
+  "notifications.from": "Da",
+  "notifications.size": "Dimensione"
 }

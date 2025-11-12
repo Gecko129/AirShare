@@ -49,13 +49,13 @@ export function AutoAcceptNotification() {
   };
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0 || !bytes) return "0 KB";
+    if (!bytes || bytes === 0) return `0 ${t('size_units.kb')}`;
     const kb = bytes / 1024;
-    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    if (kb < 1024) return `${kb.toFixed(1)} ${t('size_units.kb')}`;
     const mb = kb / 1024;
-    if (mb < 1024) return `${mb.toFixed(1)} MB`;
+    if (mb < 1024) return `${mb.toFixed(1)} ${t('size_units.mb')}`;
     const gb = mb / 1024;
-    return `${gb.toFixed(2)} GB`;
+    return `${gb.toFixed(2)} ${t('size_units.gb')}`;
   };
 
   if (notifications.length === 0) return null;
@@ -98,11 +98,11 @@ export function AutoAcceptNotification() {
                 
                 <div className="text-xs text-white/80 space-y-0.5">
                   <div className="flex items-center justify-between">
-                    <span>{t('notifications.from', 'Da')}:</span>
+                    <span>{t('notifications.from')}:</span>
                     <span className="font-mono">{notification.event.device_name}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>{t('notifications.size', 'Dimensione')}:</span>
+                    <span>{t('notifications.size')}:</span>
                     <span>{formatFileSize(notification.event.file_size)}</span>
                   </div>
                 </div>

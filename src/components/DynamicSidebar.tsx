@@ -68,11 +68,13 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
   const selectedDeviceKeys = useMemo(() => {
     const names = new Set<string>();
     const ips = new Set<string>();
+    const macs = new Set<string>();
     (selectedDevices || []).forEach(d => {
       if (d?.name) names.add(String(d.name));
       if (d?.ip || d?.ipAddress) ips.add(String(d.ip || d.ipAddress));
+      if (d?.mac) macs.add(String(d.mac));
     });
-    return { names, ips };
+    return { names, ips, macs };
   }, [selectedDevices]);
 
   // Controlla se una data è "oggi"
@@ -93,7 +95,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
   // Calcola stats di oggi dal frontend
   const computeTodayStats = (records: BackendTransferRecord[]) => {
     // Filtra: solo di oggi, completati, e con device selezionati (se c'è selezione)
-    const hasSelection = selectedDeviceKeys.names.size > 0 || selectedDeviceKeys.ips.size > 0;
+    const hasSelection = selectedDeviceKeys.names.size > 0 || selectedDeviceKeys.ips.size > 0 || selectedDeviceKeys.macs.size > 0;
     
     const relevant = records.filter(r => {
       // Deve essere di oggi
@@ -105,7 +107,9 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
           selectedDeviceKeys.names.has(r.fromDevice) ||
           selectedDeviceKeys.names.has(r.toDevice) ||
           selectedDeviceKeys.ips.has(r.fromDevice) ||
-          selectedDeviceKeys.ips.has(r.toDevice);
+          selectedDeviceKeys.ips.has(r.toDevice) ||
+          selectedDeviceKeys.macs.has(r.fromDevice) ||
+          selectedDeviceKeys.macs.has(r.toDevice);
         return involvesSelected;
       }
       
