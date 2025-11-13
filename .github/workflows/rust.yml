@@ -47,7 +47,6 @@ jobs:
     
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
-    continue-on-error: true
 
     steps:
       # ========================================
@@ -75,12 +74,6 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-      - name: install jq (only on self-hosted runner)
-        if: runner.environment == 'self-hosted'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-  
       - name: Cache Node.js dependencies
         if: contains(matrix.os, 'self-hosted') == false
         uses: actions/cache@v4
@@ -331,7 +324,7 @@ jobs:
           if [[ "$(nproc)" -gt 2 ]]; then
             export UV_THREADPOOL_SIZE=$(nproc)
           fi
-          npm run build -- --define VITE_BUILD_DATE='"$(date +%Y-%m-%d)"'
+          npm run build
       - name: Install frontend dependencies
         if: contains(matrix.os, 'self-hosted') == false
         shell: bash
@@ -350,7 +343,7 @@ jobs:
           if [[ "${{ runner.os }}" == "Linux" ]] && [[ "$(nproc)" -gt 2 ]]; then
             export UV_THREADPOOL_SIZE=$(nproc)
           fi
-          npm run build -- --define VITE_BUILD_DATE='"$(date +%Y-%m-%d)"'
+          npm run build
       # ========================================
       # BUILD TAURI (SUPER OTTIMIZZATO)
       # ========================================
@@ -465,7 +458,7 @@ jobs:
     name: Upload to Server via SFTP
     needs: build
     runs-on: ubuntu-latest
-    if: always()
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     strategy:
       matrix:
@@ -533,7 +526,6 @@ jobs:
   upload-github:
     name: Archive on GitHub
     needs: build
-    if: always()
     runs-on: ubuntu-latest
     
     strategy:
