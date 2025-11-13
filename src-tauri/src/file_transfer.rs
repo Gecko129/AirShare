@@ -55,6 +55,8 @@ async fn add_trusted_device_mac_internal(mac: &str) -> Result<(), String> {
 struct AppSettings {
     #[serde(default)]
     auto_accept_trusted: bool,
+    #[serde(default)]
+    notifications_enabled: bool,
 }
 
 async fn app_data_dir() -> anyhow::Result<PathBuf> {
@@ -310,16 +312,16 @@ pub async fn add_recent_transfer(
         .unwrap_or_else(|| "Unknown Device".to_string());
 
     let (from_device, to_device) = match transfer_type {
-        TransferType::Sent => (local_device, target_name.clone()),
-        TransferType::Received => (target_name.clone(), local_device),
+        TransferType::Sent => (local_device.clone(), target_name.clone()),
+        TransferType::Received => (target_name.clone(), local_device.clone()),
     };
 
     let record = TransferRecord {
         id: uuid::Uuid::new_v4().to_string(),
-        file_name,
+        file_name: file_name.clone(),
         file_size,
-        transfer_type,
-        status,
+        transfer_type: transfer_type.clone(),
+        status: status.clone(),
         from_device,
         to_device,
         start_time: chrono::Utc::now().to_rfc3339(),
@@ -330,7 +332,18 @@ pub async fn add_recent_transfer(
 
     save_recent_transfer(&app_handle, &record)
         .await
-        .map_err(|e| format!("failed to save recent transfer: {}", e))
+        .map_err(|e| format!("failed to save recent transfer: {}", e))?;
+
+    // Invia notifica se il trasferimento è completato
+    if matches!(status, TransferStatus::Completed) {
+        let (from, to) = match transfer_type {
+            TransferType::Sent => (local_device, target_name),
+            TransferType::Received => (target_name, local_device),
+        };
+        let _ = send_completion_notification(&app_handle, &file_name, &from, &to, &transfer_type, file_size).await;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -1600,4 +1613,56 @@ async fn is_send_cancelled(target_ip: &str, target_port: u16) -> bool {
 async fn is_receive_cancelled(transfer_id: &str) -> bool {
     let cancelled = CANCELLED_RECEIVE.lock().await;
     cancelled.contains(transfer_id)
+}
+
+/// Invia una notifica elegante di trasferimento completato
+async fn send_completion_notification(
+    app_handle: &AppHandle,
+    file_name: &str,
+    from_device: &str,
+    to_device: &str,
+    transfer_type: &TransferType,
+    file_size: u64,
+) -> Result<(), String> {
+    let settings = read_settings().await;
+    if !settings.notifications_enabled {
+        return Ok(());
+    }
+
+    let (title, message) = match transfer_type {
+        TransferType::Sent => (
+            format!("📤 File inviato con successo"),
+            format!("'{}' ({}) inviato a {}", file_name, format_file_size_helper(file_size), to_device)
+        ),
+        TransferType::Received => (
+            format!("📥 File ricevuto con successo"),
+            format!("'{}' ({}) ricevuto da {}", file_name, format_file_size_helper(file_size), from_device)
+        ),
+    };
+
+    let _ = app_handle.emit("transfer_notification", serde_json::json!({
+        "title": title,
+        "message": message,
+        "type": match transfer_type {
+            TransferType::Sent => "sent",
+            TransferType::Received => "received",
+        },
+        "file_name": file_name,
+        "from_device": from_device,
+        "to_device": to_device,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+    }));
+
+    Ok(())
+}
+
+fn format_file_size_helper(bytes: u64) -> String {
+    if bytes == 0 {
+        return "0 B".to_string();
+    }
+    let k: f64 = 1024.0;
+    let sizes = ["B", "KB", "MB", "GB"];
+    let i = (bytes as f64).log(k) as usize;
+    let size_val = bytes as f64 / k.powi(i as i32);
+    format!("{:.1} {}", size_val, sizes[i.min(sizes.len() - 1)])
 }

@@ -18,6 +18,8 @@ import frFlag from "../assets/fr.jpg";
 import deFlag from "../assets/de.jpg";
 import zhFlag from "../assets/zh.jpg";
 
+type Theme = 'light' | 'dark';
+
 type Language = {
   code: string;
   name: string;
@@ -87,6 +89,21 @@ export function Settings() {
     };
   }, [i18n]);
 
+  // Sync notifications with backend settings
+  useEffect(() => {
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke<boolean>("get_notifications_enabled").then((val) => {
+        setNotifications(!!val);
+      }).catch(() => {});
+    });
+  }, []);
+
+  useEffect(() => {
+    import("@tauri-apps/api/core").then(({ invoke }) => {
+      invoke("set_notifications_enabled", { value: notifications }).catch(() => {});
+    });
+  }, [notifications]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -105,7 +122,13 @@ export function Settings() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="theme-select">{t('settings.theme')}</Label>
-              <Select value={theme} onValueChange={setTheme}>
+              <Select value={theme} onValueChange={(value) => {
+                // Non permettere il cambio al tema scuro
+                if (value === 'dark') {
+                  return;
+                }
+                setTheme(value as Theme);
+              }}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -116,10 +139,12 @@ export function Settings() {
                       <span>{t('settings.theme_light')}</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="dark">
+                  <SelectItem value="dark" disabled>
                     <div className="flex items-center gap-2">
-                      <Moon className="w-4 h-4" />
-                      <span>{t('settings.theme_dark')}</span>
+                      <Moon className="w-4 h-4 text-gray-400" />
+                      <span className="text-gray-400">
+                        {t('settings.theme_dark')} — <span className="text-xs">Coming Soon</span>
+                      </span>
                     </div>
                   </SelectItem>
                 </SelectContent>

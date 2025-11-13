@@ -26,6 +26,7 @@ import PrivacyPolicy from "./components/PrivacyPolicy";
 import TermsOfService from "./components/TermsOfService";
 import { TransferPrompt } from "./components/TransferPrompt";
 import { AutoAcceptNotification } from './components/AutoAcceptNotification';
+import { TransferNotification } from './components/TransferNotification';
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -491,6 +492,8 @@ function AppContent() {
       </main>
       {/* Mount global TransferPrompt listener */}
       <TransferPrompt />
+      {/* Mount global TransferNotification listener */}
+      <TransferNotification />
     </div>
   );
 }
