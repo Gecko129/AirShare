@@ -498,10 +498,11 @@ jobs:
           echo "✅ SFTP structure ready:"
           find sftp-upload -type f
       
-      - name: Setup SSH key
-        uses: webfactory/ssh-agent@v0.5.4
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: start ssh agent manually
+        shell: bash
+        run: |
+          eval "$(ssh-agent -s)"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' | ssh-add -
       
       - name: Upload to server via SFTP
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
