@@ -75,6 +75,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
 
+      - name: install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+  
       - name: Cache Node.js dependencies
         if: contains(matrix.os, 'self-hosted') == false
         uses: actions/cache@v4
