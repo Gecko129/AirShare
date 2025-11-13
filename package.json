@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --define:VITE_BUILD_DATE='\"'$(date +%Y.%m.%d)'\"'",
+    "build": "vite build",
     "build-with-types": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri": "tauri"
