@@ -251,5 +251,10 @@
   "terms.sections.9.title": "9. Term and Termination",
   "terms.sections.9.body": "These Terms are valid from the date of acceptance and remain in effect until cessation of Application use. The user may discontinue use of the Application at any time; AirShare reserves the right to suspend or terminate access in case of serious or repeated breach of Terms.",
   "terms.sections.10.title": "10. Applicable Law and Jurisdiction",
-  "terms.sections.10.body": "These Terms are governed by Italian law. For any dispute relating to the interpretation or execution of the Terms, the Court of Padua shall have exclusive jurisdiction, unless otherwise mandated by applicable law."
+  "terms.sections.10.body": "These Terms are governed by Italian law. For any dispute relating to the interpretation or execution of the Terms, the Court of Padua shall have exclusive jurisdiction, unless otherwise mandated by applicable law.",
+  "transfer.incoming_title": "Incoming Transfers",
+  "transfer.incoming_subtitle": "Files being received",
+  "send_file_with_progress.cancel_tooltip": "Cancel transfer",
+  "send_file_with_progress.files_completed": "files completed",
+  "send_file_with_progress.in_progress": "In progress"
 }

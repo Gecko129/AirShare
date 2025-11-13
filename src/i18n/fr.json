@@ -1,4 +1,4 @@
-  {
+{
     "transfer_request_title": "Demande de transfert",
     "transfer_request_description": "{{device}} souhaite vous envoyer le fichier '{{file}}' ({{size}})",
     "accept": "Accepter",
@@ -253,5 +253,10 @@
     "settings.no_trusted_devices_hint": "Les appareils acceptant automatiquement les fichiers apparaîtront ici.",
     "notifications.auto_accepted_title": "Transfert auto-accepté",
     "notifications.from": "De",
-    "notifications.size": "Taille"
-  }
+    "notifications.size": "Taille",
+    "transfer.incoming_title": "Transferts Entrants",
+    "transfer.incoming_subtitle": "Fichiers en cours de réception",
+    "send_file_with_progress.cancel_tooltip": "Annuler le transfert",
+    "send_file_with_progress.files_completed": "fichiers terminés",
+    "send_file_with_progress.in_progress": "En cours"
+}

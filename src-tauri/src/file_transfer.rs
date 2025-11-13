@@ -819,6 +819,27 @@ pub async fn start_file_server(app_handle: tauri::AppHandle) -> anyhow::Result<(
             let transfer_start = Instant::now();
             info!("({addr}) Beginning binary receive of {} bytes for transfer {}", offer.file_size, transfer_id);
             while received < offer.file_size {
+                // Check if transfer was cancelled
+                if is_receive_cancelled(&transfer_id).await {
+                    error!("({addr}) Receive transfer was cancelled by user");
+                    tauri_log(&app_handle, "warn", format!("Receive transfer {} was cancelled", transfer_id)).await;
+                    let _ = add_recent_transfer(
+                        app_handle.clone(),
+                        offer.file_name.clone(),
+                        offer.file_size,
+                        TransferType::Received,
+                        addr.ip().to_string(),
+                        addr.ip().to_string(),
+                        transfer_start.elapsed().as_millis(),
+                        TransferStatus::Cancelled,
+                    ).await;
+                    // Cleanup cancelled state and temp file
+                    let mut cancelled = CANCELLED_RECEIVE.lock().await;
+                    cancelled.remove(&transfer_id);
+                    let _ = tokio::fs::remove_file(&temp_path).await;
+                    return;
+                }
+
                 let to_read = std::cmp::min(buffer.len() as u64, offer.file_size - received) as usize;
                 let n = match socket.read(&mut buffer[..to_read]).await {
                     Ok(0) => {
@@ -1160,6 +1181,26 @@ pub async fn send_file_with_progress(
     let mut last_log = Instant::now();
     let transfer_start = Instant::now();
     while sent < file_size {
+        // Check if transfer was cancelled
+        if is_send_cancelled(&target_ip, target_port).await {
+            error!("({addr}) Send transfer was cancelled by user");
+            tauri_log(&app_handle, "warn", format!("Send transfer to {} was cancelled", addr)).await;
+            let _ = add_recent_transfer(
+                app_handle.clone(),
+                actual_file_name.clone(),
+                file_size,
+                TransferType::Sent,
+                target_ip.clone(),
+                target_ip.clone(),
+                overall_start.elapsed().as_millis(),
+                TransferStatus::Cancelled,
+            ).await;
+            // Cleanup cancelled state
+            let mut cancelled = CANCELLED_TRANSFERS.lock().await;
+            cancelled.remove(&format!("{}:{}", target_ip, target_port));
+            return Err(anyhow::anyhow!("Transfer cancelled by user"));
+        }
+
         let to_read = std::cmp::min(buffer.len() as u64, file_size - sent) as usize;
         let n = match file.read(&mut buffer[..to_read]).await {
             Ok(n) => n,
@@ -1331,7 +1372,7 @@ pub async fn send_file_with_progress(
                 last_log = Instant::now();
             }
         }
-    }
+    } // END OF WHILE LOOP FOR SENDING FILE
 
     if let Err(e) = stream.flush().await {
         warn!("Flush after sending file failed: {}", e);
@@ -1397,9 +1438,8 @@ pub async fn send_file_with_progress(
         TransferStatus::Completed,
     ).await;
 
-    // Funzione di dialogo rimossa come richiesto
     Ok(())
-}
+} // END OF send_file_with_progress FUNCTION
 
 #[tauri::command]
 pub async fn get_system_stats() -> Result<serde_json::Value, String> {
@@ -1525,4 +1565,39 @@ pub async fn respond_transfer(args: RespondTransferArgs) {
             }
         }
     }
+}
+
+// Global state for cancelled transfers
+static CANCELLED_TRANSFERS: Lazy<TokioMutex<std::collections::HashSet<String>>> = 
+    Lazy::new(|| TokioMutex::new(std::collections::HashSet::new()));
+
+static CANCELLED_RECEIVE: Lazy<TokioMutex<std::collections::HashSet<String>>> = 
+    Lazy::new(|| TokioMutex::new(std::collections::HashSet::new()));
+
+#[tauri::command]
+pub async fn cancel_transfer_send(target_ip: String, target_port: u16) -> Result<(), String> {
+    let key = format!("{}:{}", target_ip, target_port);
+    let mut cancelled = CANCELLED_TRANSFERS.lock().await;
+    cancelled.insert(key);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn cancel_transfer_receive(transfer_id: String) -> Result<(), String> {
+    let mut cancelled = CANCELLED_RECEIVE.lock().await;
+    cancelled.insert(transfer_id);
+    Ok(())
+}
+
+// Helper function to check if a send transfer should be cancelled
+async fn is_send_cancelled(target_ip: &str, target_port: u16) -> bool {
+    let key = format!("{}:{}", target_ip, target_port);
+    let cancelled = CANCELLED_TRANSFERS.lock().await;
+    cancelled.contains(&key)
+}
+
+// Helper function to check if a receive transfer should be cancelled
+async fn is_receive_cancelled(transfer_id: &str) -> bool {
+    let cancelled = CANCELLED_RECEIVE.lock().await;
+    cancelled.contains(transfer_id)
 }

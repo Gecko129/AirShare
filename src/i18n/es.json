@@ -251,5 +251,10 @@
   "terms.sections.9.title": "9. Duración y terminación",
   "terms.sections.9.body": "Estos Términos son válidos desde la fecha de aceptación y permanecen en vigencia hasta el cese del uso de la Aplicación. El usuario puede descontinuar el uso de la Aplicación en cualquier momento; AirShare se reserva el derecho de suspender o terminar el acceso en caso de violación grave o repetida de los Términos.",
   "terms.sections.10.title": "10. Ley aplicable y jurisdicción",
-  "terms.sections.10.body": "Estos Términos se rigen por la ley italiana. Para cualquier controversia relacionada con la interpretación o ejecución de los Términos, el Tribunal de Padua tendrá jurisdicción exclusiva, a menos que se disponga lo contrario por ley aplicable."
+  "terms.sections.10.body": "Estos Términos se rigen por la ley italiana. Para cualquier controversia relacionada con la interpretación o ejecución de los Términos, el Tribunal de Padua tendrá jurisdicción exclusiva, a menos que se disponga lo contrario por ley aplicable.",
+  "transfer.incoming_title": "Transferencias entrantes",
+  "transfer.incoming_subtitle": "Archivos en proceso de recepción",
+  "send_file_with_progress.cancel_tooltip": "Cancelar envío",
+  "send_file_with_progress.files_completed": "archivos completados",
+  "send_file_with_progress.in_progress": "En progreso"
 }

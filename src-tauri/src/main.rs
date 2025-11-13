@@ -155,7 +155,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             file_transfer::get_system_stats,
             file_transfer::get_today_stats,
             file_transfer::add_trusted_device_mac,
-            file_transfer::remove_trusted_device_mac
+            file_transfer::remove_trusted_device_mac,
+            file_transfer::cancel_transfer_send,
+            file_transfer::cancel_transfer_receive
          ])
         .run(tauri::generate_context!())
         .expect("error running tauri app");

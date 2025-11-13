@@ -253,5 +253,10 @@
   "terms.sections.9.title": "9. 期限和终止",
   "terms.sections.9.body": "这些条款从接受之日起生效,并在用户停止使用应用程序时失效。用户可随时停止使用该应用程序;AirShare 保留在严重或重复违反条款的情况下暂停或终止访问权限的权利。",
   "terms.sections.10.title": "10. 适用法律和管辖权",
-  "terms.sections.10.body": "这些条款受意大利法律管辖。对于与条款的解释或执行有关的任何争议,帕多瓦法院具有专属管辖权,除非适用法律另有规定。"
+  "terms.sections.10.body": "这些条款受意大利法律管辖。对于与条款的解释或执行有关的任何争议,帕多瓦法院具有专属管辖权,除非适用法律另有规定。",
+  "transfer.incoming_title": "传入传输",
+  "transfer.incoming_subtitle": "正在接收的文件",
+  "send_file_with_progress.cancel_tooltip": "取消传输",
+  "send_file_with_progress.files_completed": "个文件已完成",
+  "send_file_with_progress.in_progress": "进行中"
 }

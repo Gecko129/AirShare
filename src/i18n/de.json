@@ -253,5 +253,10 @@
   "terms.sections.9.title": "9. Geltungsdauer und Beendigung",
   "terms.sections.9.body": "Diese Bedingungen sind ab Akzeptanzsdatum gültig und bleiben bis zur Beendigung der Anwendungsnutzung in Kraft. Der Benutzer kann die Anwendungsnutzung jederzeit beenden; AirShare behält sich das Recht vor, den Zugriff bei schwerwiegender oder wiederholter Bedingungsverletzung zu sperren oder zu beenden.",
   "terms.sections.10.title": "10. Anwendbares Recht und Jurisdiktion",
-  "terms.sections.10.body": "Diese Bedingungen werden durch italienisches Recht geregelt. Für alle Streitigkeiten bezüglich Auslegung oder Ausführung der Bedingungen ist das Gericht von Padua ausschließlich zuständig, sofern das geltende Recht nichts anderes vorsieht."
+  "terms.sections.10.body": "Diese Bedingungen werden durch italienisches Recht geregelt. Für alle Streitigkeiten bezüglich Auslegung oder Ausführung der Bedingungen ist das Gericht von Padua ausschließlich zuständig, sofern das geltende Recht nichts anderes vorsieht.",
+  "transfer.incoming_title": "Eingehende Übertragungen",
+  "transfer.incoming_subtitle": "Dateien werden empfangen",
+  "send_file_with_progress.cancel_tooltip": "Übertragung abbrechen",
+  "send_file_with_progress.files_completed": "Dateien abgeschlossen",
+  "send_file_with_progress.in_progress": "In Bearbeitung"
 }

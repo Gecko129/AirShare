@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import type { Device } from '../types/device';
 import { useTranslation } from "react-i18next";
 import { toast } from 'sonner';
+import { IncomingTransfers } from './IncomingTransfers';
 
 interface FileTransferProps {
   selectedDevices: string[];
@@ -36,6 +37,7 @@ export function FileTransfer({
   const [uploadETA, setUploadETA] = useState<Record<string, string>>({});
   const [generalProgress, setGeneralProgress] = useState<Record<string, { percent: number; eta?: string; currentFile?: string; totalFiles: number; completedFiles: number }>>({});
   const [allDevices, setAllDevices] = useState<Device[]>([]);
+  const [cancelledTransfers, setCancelledTransfers] = useState<Set<string>>(new Set());
 
  
  
@@ -435,6 +437,36 @@ export function FileTransfer({
     setGeneralProgress({});
   };
 
+  const handleCancelSend = async (deviceKey: string) => {
+    try {
+      const [ip, port] = deviceKey.split(':');
+      await invoke('cancel_transfer_send', { 
+        target_ip: ip,
+        target_port: parseInt(port, 10)
+      });
+      setCancelledTransfers(prev => new Set([...prev, deviceKey]));
+      setUploadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[deviceKey];
+        return newProgress;
+      });
+      setUploadETA(prev => {
+        const newETA = { ...prev };
+        delete newETA[deviceKey];
+        return newETA;
+      });
+      setGeneralProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[deviceKey];
+        return newProgress;
+      });
+      toast.info(`Invio verso ${deviceKey} annullato`);
+    } catch (error) {
+      console.error('Errore durante l\'annullamento:', error);
+      toast.error('Errore nell\'annullamento del trasferimento');
+    }
+  };
+
   const removeFile = (index?: number) => {
     if (typeof index === 'number') {
       onFilesChange(selectedFiles.filter((_, i) => i !== index));
@@ -454,222 +486,238 @@ export function FileTransfer({
   const canSend = selectedFiles.length > 0 && selectedDevices.length > 0 && !isUploading;
 
   return (
-    <Card className="backdrop-blur-md bg-white/70 border border-slate-200 shadow-xl p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 backdrop-blur-sm">
-          <Upload className="w-6 h-6 text-slate-700" />
-        </div>
-        <div>
-          <h2 className="text-slate-900">{t("file_transfer_title")}</h2>
-          <p className="text-slate-600 text-sm">{t("file_transfer_description")}</p>
-        </div>
-      </div>
-
-      {/* Dispositivi di destinazione */}
-      {selectedDevices.length > 0 && (
-        <div className="mb-6 p-4 rounded-lg bg-slate-50 border border-slate-200">
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="w-4 h-4 text-slate-700" />
-            <span className="text-slate-800 text-sm">
-              {t("sending_to_devices", { count: selectedDevices.length })}
-            </span>
+    <>
+      <Card className="backdrop-blur-md bg-white/70 border border-slate-200 shadow-xl p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 backdrop-blur-sm">
+            <Upload className="w-6 h-6 text-slate-700" />
           </div>
-          <div className="space-y-2">
-            {selectedDevices.map(deviceRef => {
-              const deviceId = typeof deviceRef === 'string' ? deviceRef : (deviceRef as any)?.id ?? (deviceRef as any)?.ip ?? String(deviceRef ?? '');
-              const foundDevice = allDevices.find(d => d.id === deviceId);
-              let ip: string;
-              let port: number;
-              let name: string;
-              
-              if (foundDevice) {
-                const device = foundDevice as Device;
-                ip = device.ip;
-                port = typeof device.port === "string" ? parseInt(device.port, 10) || 40124 : device.port ?? 40124;
-                name = device.name ?? t('device.default_name');
-              } else if (typeof deviceId === 'string' && deviceId.includes(':')) {
-                const [parsedIp, parsedPort] = deviceId.split(':');
-                ip = parsedIp;
-                port = parseInt(parsedPort, 10) || 40124;
-                name = t('device.default_name');
-              } else {
-                ip = String(deviceId);
-                port = 40124;
-                name = t('device.default_name');
-              }
-              const key = `${ip}:${port}`;
+          <div>
+            <h2 className="text-slate-900">{t("file_transfer_title")}</h2>
+            <p className="text-slate-600 text-sm">{t("file_transfer_description")}</p>
+          </div>
+        </div>
 
-              return (
-                <div key={deviceId} className="text-sm space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-800">{`${name} (${ip})`}</span>
-                    {isUploading && generalProgress[key] !== undefined && (
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-20 h-1 bg-slate-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-slate-600 transition-all duration-300"
-                              style={{ width: `${generalProgress[key].percent}%` }}
-                            />
+        {/* Dispositivi di destinazione */}
+        {selectedDevices.length > 0 && (
+          <div className="mb-6 p-4 rounded-lg bg-slate-50 border border-slate-200">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="w-4 h-4 text-slate-700" />
+              <span className="text-slate-800 text-sm">
+                {t("sending_to_devices", { count: selectedDevices.length })}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {selectedDevices.map(deviceRef => {
+                const deviceId = typeof deviceRef === 'string' ? deviceRef : (deviceRef as any)?.id ?? (deviceRef as any)?.ip ?? String(deviceRef ?? '');
+                const foundDevice = allDevices.find(d => d.id === deviceId);
+                let ip: string;
+                let port: number;
+                let name: string;
+                
+                if (foundDevice) {
+                  const device = foundDevice as Device;
+                  ip = device.ip;
+                  port = typeof device.port === "string" ? parseInt(device.port, 10) || 40124 : device.port ?? 40124;
+                  name = device.name ?? t('device.default_name');
+                } else if (typeof deviceId === 'string' && deviceId.includes(':')) {
+                  const [parsedIp, parsedPort] = deviceId.split(':');
+                  ip = parsedIp;
+                  port = parseInt(parsedPort, 10) || 40124;
+                  name = t('device.default_name');
+                } else {
+                  ip = String(deviceId);
+                  port = 40124;
+                  name = t('device.default_name');
+                }
+                const key = `${ip}:${port}`;
+
+                return (
+                  <div key={deviceId} className="text-sm space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-800">{`${name} (${ip})`}</span>
+                      <div className="flex items-center gap-2">
+                        {isUploading && generalProgress[key] !== undefined && (
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-20 h-1 bg-slate-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-slate-600 transition-all duration-300"
+                                  style={{ width: `${generalProgress[key].percent}%` }}
+                                />
+                              </div>
+                              <span className="text-slate-600 text-xs w-8">{generalProgress[key].percent}%</span>
+                            </div>
+                            {generalProgress[key].eta && generalProgress[key].eta !== t("calculating_eta") && (
+                              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 border border-slate-200">
+                                <span className="text-slate-700 text-xs">⏱️</span>
+                                <span className="text-slate-700 text-xs">{generalProgress[key].eta}</span>
+                              </div>
+                            )}
+                            {generalProgress[key].eta === t("calculating_eta") && (
+                              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 border border-slate-200">
+                                <span className="text-slate-600 text-xs">⏳</span>
+                                <span className="text-slate-700 text-xs">{t("calculating_eta")}</span>
+                              </div>
+                            )}
+                            <Button
+                              onClick={() => handleCancelSend(key)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title={t('send_file_with_progress.cancel_tooltip')}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
                           </div>
-                          <span className="text-slate-600 text-xs w-8">{generalProgress[key].percent}%</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {isUploading && generalProgress[key] && (
+                      <div className="space-y-2 pl-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-gray-400 text-xs">
+                            {generalProgress[key].completedFiles}/{generalProgress[key].totalFiles} {t('send_file_with_progress.files_completed')}
+                          </span>
+                          {generalProgress[key].currentFile && (
+                            <span className="text-gray-500 text-xs truncate max-w-xs">
+                              {t('send_file_with_progress.in_progress')}: {generalProgress[key].currentFile}
+                            </span>
+                          )}
                         </div>
-                        {generalProgress[key].eta && generalProgress[key].eta !== t("calculating_eta") && (
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 border border-slate-200">
-                            <span className="text-slate-700 text-xs">⏱️</span>
-                            <span className="text-slate-700 text-xs">{generalProgress[key].eta}</span>
-                          </div>
-                        )}
-                        {generalProgress[key].eta === t("calculating_eta") && (
-                          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 border border-slate-200">
-                            <span className="text-slate-600 text-xs">⏳</span>
-                            <span className="text-slate-700 text-xs">{t("calculating_eta")}</span>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
-
-                  {isUploading && generalProgress[key] && (
-                    <div className="space-y-2 pl-2">
-                      <div className="flex items-center gap-3">
-                        <span className="text-gray-400 text-xs">
-                          {generalProgress[key].completedFiles}/{generalProgress[key].totalFiles} file completati
-                        </span>
-                        {generalProgress[key].currentFile && (
-                          <span className="text-gray-500 text-xs truncate max-w-xs">
-                            {t('in_progress')}: {generalProgress[key].currentFile}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* File drop area */}
-      <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onClick={handleFileDialog}
-        className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${
-          isDragging
-            ? 'border-blue-400 bg-blue-50'
-            : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
-        }`}
-      >
-        <AnimatePresence mode="wait">
-          {selectedFiles.length === 0 ? (
-            <motion.div
-              key="upload-area"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-4"
-            >
-              <div className="p-4 rounded-full bg-slate-100 w-fit mx-auto">
-                <Upload className="w-8 h-8 text-slate-600" />
-              </div>
-              <div>
-                <p className="text-slate-800">{t("drop_file_text")}</p>
-                <p className="text-slate-600 text-sm mt-1">{t("drop_file_subtext")}</p>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="file-list"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="space-y-3"
-            >
-              <div className="space-y-2">
-                {selectedFiles.map((f, idx) => (
-                  <div key={`${f.name}-${idx}`} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
-                    <div className="flex items-center gap-3">
-                      <File className="w-6 h-6 text-slate-700" />
-                      <div className="text-left">
-                        <p className="text-slate-800 truncate max-w-xs">{f.name}</p>
-                        <p className="text-slate-600 text-sm">{formatFileSize(f.size)}</p>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        removeFile(idx);
-                      }}
-                      variant="ghost"
-                      size="sm"
-                      className="text-slate-600 hover:text-slate-800 hover:bg-slate-100"
-                      type="button"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-                <div className="flex justify-end">
-                  <Button
-                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); removeFile(); }}
-                    variant="ghost"
-                    size="sm"
-                    className="text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                    type="button"
-                  >
-                    {t("remove_everything")}
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {selectedFiles.length > 0 && selectedDevices.length === 0 && (
-        <div className="mt-4 p-3 rounded-lg bg-orange-50 border border-orange-200 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-orange-600" />
-          <span className="text-orange-700 text-sm">{t("no_device_selected")}</span>
-        </div>
-      )}
-
-      <div className="mt-6 flex justify-end">
-        <Button
-          onClick={handleSend}
-          disabled={!canSend}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-0 shadow-lg backdrop-blur-sm disabled:opacity-50"
-          type="button"
+        {/* File drop area */}
+        <div
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onClick={handleFileDialog}
+          className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${
+            isDragging
+              ? 'border-blue-400 bg-blue-50'
+              : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+          }`}
         >
           <AnimatePresence mode="wait">
-            {isUploading ? (
+            {selectedFiles.length === 0 ? (
               <motion.div
-                key="uploading"
-                initial={{ opacity: 0, rotate: -180 }}
-                animate={{ opacity: 1, rotate: 0 }}
-                exit={{ opacity: 0, rotate: 180 }}
-                className="flex items-center gap-2"
+                key="upload-area"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
               >
-                <div className="w-4 h-4 border-2 border-gray-400/40 border-t-gray-200 rounded-full animate-spin" />
-                {t("uploading")}
+                <div className="p-4 rounded-full bg-slate-100 w-fit mx-auto">
+                  <Upload className="w-8 h-8 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-slate-800">{t("drop_file_text")}</p>
+                  <p className="text-slate-600 text-sm mt-1">{t("drop_file_subtext")}</p>
+                </div>
               </motion.div>
             ) : (
               <motion.div
-                key="send"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                className="flex items-center gap-2"
+                key="file-list"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="space-y-3"
               >
-                <Send className="w-4 h-4" />
-                {t("send_button_text", { count: selectedDevices.length })}
+                <div className="space-y-2">
+                  {selectedFiles.map((f, idx) => (
+                    <div key={`${f.name}-${idx}`} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex items-center gap-3">
+                        <File className="w-6 h-6 text-slate-700" />
+                        <div className="text-left">
+                          <p className="text-slate-800 truncate max-w-xs">{f.name}</p>
+                          <p className="text-slate-600 text-sm">{formatFileSize(f.size)}</p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          removeFile(idx);
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-600 hover:text-slate-800 hover:bg-slate-100"
+                        type="button"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={(e: React.MouseEvent) => { e.stopPropagation(); removeFile(); }}
+                      variant="ghost"
+                      size="sm"
+                      className="text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                      type="button"
+                    >
+                      {t("remove_everything")}
+                    </Button>
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </Button>
-      </div>
-    </Card>
+        </div>
+
+        {selectedFiles.length > 0 && selectedDevices.length === 0 && (
+          <div className="mt-4 p-3 rounded-lg bg-orange-50 border border-orange-200 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-orange-600" />
+            <span className="text-orange-700 text-sm">{t("no_device_selected")}</span>
+          </div>
+        )}
+
+        <div className="mt-6 flex justify-end">
+          <Button
+            onClick={handleSend}
+            disabled={!canSend}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-0 shadow-lg backdrop-blur-sm disabled:opacity-50"
+            type="button"
+          >
+            <AnimatePresence mode="wait">
+              {isUploading ? (
+                <motion.div
+                  key="uploading"
+                  initial={{ opacity: 0, rotate: -180 }}
+                  animate={{ opacity: 1, rotate: 0 }}
+                  exit={{ opacity: 0, rotate: 180 }}
+                  className="flex items-center gap-2"
+                >
+                  <div className="w-4 h-4 border-2 border-gray-400/40 border-t-gray-200 rounded-full animate-spin" />
+                  {t("uploading")}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="send"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="flex items-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  {t("send_button_text", { count: selectedDevices.length })}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Button>
+        </div>
+      </Card>
+
+      {/* Incoming Transfers Section */}
+      <IncomingTransfers />
+    </>
   );
 }

@@ -19,7 +19,17 @@ import {
   Trash2
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from './ui/alert-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
@@ -142,6 +152,32 @@ export function TransferHistory() {
     }
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-700 border-green-200';
+      case 'cancelled':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'failed':
+        return 'bg-red-100 text-red-700 border-red-200';
+      default:
+        return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return t('history.status.completed');
+      case 'cancelled':
+        return t('history.status.cancelled');
+      case 'failed':
+        return t('history.status.failed');
+      default:
+        return status;
+    }
+  };
+
   const getStatusBadge = (status: TransferRecord['status']) => {
     switch (status) {
       case 'completed':
@@ -188,9 +224,13 @@ export function TransferHistory() {
     .filter(t => t.status === 'completed')
     .reduce((acc, t) => acc + t.fileSize, 0);
 
-  const handleDeleteClick = (transfer: TransferRecord) => {
-    setTransferToDelete(transfer);
-    setDeleteDialogOpen(true);
+  const handleDeleteTransfer = async (transferId: string) => {
+    try {
+      await invoke('delete_recent_transfer', { transfer_id: transferId });
+      setTransfers(prev => prev.filter(t => t.id !== transferId));
+    } catch (error) {
+      console.error('Errore nell\'eliminazione:', error);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -359,51 +399,50 @@ export function TransferHistory() {
                       <div className="text-muted-foreground">{formatDuration(transfer.duration)}</div>
                     </>
                   )}
-                  {transfer.status === 'failed' && (
-                    <div className="text-red-500">{t('history.status.failed')}</div>
-                  )}
-                  {transfer.status === 'cancelled' && (
-                    <div className="text-yellow-500">{t('history.status.cancelled')}</div>
-                  )}
                 </div>
 
                 {/* Actions */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDeleteClick(transfer)}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {/* Status Badge */}
+                  <Badge className={`${getStatusColor(transfer.status)} border`}>
+                    {getStatusLabel(transfer.status)}
+                  </Badge>
+                  
+                  {/* Delete Button */}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('history.delete.title')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('history.delete.description')}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteTransfer(transfer.id)}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          {t('common.confirm')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </motion.div>
             ))
           )}
         </div>
       </GlassCard>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('history.delete.title')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('history.delete.description')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDeleteCancel} className="bg-gray-500 text-white hover:bg-gray-600">
-              {t('common.cancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              {t('common.confirm')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -255,5 +255,10 @@
   "settings.no_trusted_devices_hint": "I dispositivi che accettano automaticamente i file appariranno qui.",
   "notifications.auto_accepted_title": "Trasferimento Auto-Accettato",
   "notifications.from": "Da",
-  "notifications.size": "Dimensione"
-}
+  "notifications.size": "Dimensione",
+  "transfer.incoming_title": "Trasferimenti in Ricezione",
+  "transfer.incoming_subtitle": "File in fase di ricezione",
+  "send_file_with_progress.cancel_tooltip": "Annulla invio",
+  "send_file_with_progress.files_completed": "file completati",
+  "send_file_with_progress.in_progress": "In corso"
+  }
