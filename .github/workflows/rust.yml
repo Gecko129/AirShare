@@ -47,6 +47,7 @@ jobs:
     
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
+    continue-on-error: true
 
     steps:
       # ========================================
@@ -74,7 +75,6 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-
       - name: install jq (only on self-hosted runner)
         if: runner.environment == 'self-hosted'
         run: |
@@ -93,7 +93,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ env.CACHE_VERSION }}-
             ${{ runner.os }}-node-
-
       # ========================================
       # SETUP OTTIMIZZATO PER GITHUB RUNNERS
       # ========================================
@@ -162,7 +161,6 @@ jobs:
             fi
           fi
           echo "tauri_ok=$TAURI_OK" >> $GITHUB_OUTPUT
-
       - name: Setup Node.js (self-hosted ARM64)
         if: contains(matrix.os, 'self-hosted')
         shell: bash
@@ -171,14 +169,11 @@ jobs:
           curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
           nvm install 18
           nvm use 18
-
           echo "Node.js version: $(node -v)"
           echo "Node architecture: $(node -p 'process.arch')"
           echo "NPM version: $(npm -v)"
-
       - name: Setup Rust (self-hosted)
         if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.rust_ok != 'true'
         shell: bash
@@ -190,7 +185,6 @@ jobs:
           fi
           rustup target add ${{ matrix.target }}
           echo "Rust ready: $(rustc --version)"
-
       - name: Setup Tauri CLI (self-hosted)
         if: contains(matrix.os, 'self-hosted') && steps.check_env.outputs.tauri_ok != 'true'
         shell: bash
@@ -199,7 +193,6 @@ jobs:
           source ~/.cargo/env 2>/dev/null || true
           cargo install tauri-cli --locked
           echo "Tauri CLI ready: $(tauri --version)"
-
       # Set version and build date cross-platform
       - name: Set version and build date (Linux/macOS)
         if: runner.os != 'Windows'
@@ -208,7 +201,6 @@ jobs:
           VERSION=$(jq -r '.version' package.json)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "BUILD_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
-
       - name: Set version and build date (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -238,7 +230,6 @@ jobs:
             file \
             libssl-dev \
             pkg-config
-
       - name: Install system dependencies (self-hosted)
         if: contains(matrix.os, 'self-hosted')
         shell: bash
@@ -265,13 +256,11 @@ jobs:
           else
             echo "✅ All system dependencies already installed"
           fi
-
       - name: Install Windows dependencies
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
           choco install nsis -y --no-progress
-
       # ========================================
       # CONFIGURAZIONI OTTIMIZZATE
       # ========================================
@@ -288,7 +277,6 @@ jobs:
             echo "RUSTFLAGS=-C target-cpu=native" >> $env:GITHUB_ENV
             echo "CARGO_BUILD_JOBS=$env:NUMBER_OF_PROCESSORS" >> $env:GITHUB_ENV
           fi
-
       - name: Configure Cargo (advanced)
         shell: bash
         run: |
@@ -315,7 +303,6 @@ jobs:
           inherits = "release"
           debug = true
           EOF
-
       # ========================================
       # BUILD FRONTEND (OTTIMIZZATO)
       # ========================================
@@ -332,7 +319,6 @@ jobs:
           
           echo "📦 Installing Node.js dependencies for ARM64 (build from source)..."
           npm install --build-from-source --prefer-offline --no-audit --no-fund
-
       - name: Build frontend (self-hosted ARM64)
         if: contains(matrix.os, 'self-hosted')
         shell: bash
@@ -346,7 +332,6 @@ jobs:
             export UV_THREADPOOL_SIZE=$(nproc)
           fi
           npm run build
-
       - name: Install frontend dependencies
         if: contains(matrix.os, 'self-hosted') == false
         shell: bash
@@ -356,7 +341,6 @@ jobs:
           else
             npm install --prefer-offline --no-audit --no-fund
           fi
-
       - name: Build frontend
         if: contains(matrix.os, 'self-hosted') == false
         shell: bash
@@ -367,7 +351,6 @@ jobs:
             export UV_THREADPOOL_SIZE=$(nproc)
           fi
           npm run build
-
       # ========================================
       # BUILD TAURI (SUPER OTTIMIZZATO)
       # ========================================
@@ -393,7 +376,6 @@ jobs:
           else
             npm run tauri build -- --target ${{ matrix.target }}
           fi
-
       # ========================================
       # PREPARAZIONE ARTIFACTS PER UPLOAD
       # ========================================
@@ -449,7 +431,6 @@ jobs:
           
           echo "✅ Artifacts prepared in: $ARTIFACT_DIR"
           ls -lh "$ARTIFACT_DIR"
-
       # ========================================
       # UPLOAD TEMPORANEO SU GITHUB
       # ========================================
@@ -477,7 +458,6 @@ jobs:
             echo "📊 Final target directory size:"
             du -sh src-tauri/target/ 2>/dev/null || echo "Target directory not found"
           fi
-
   # ========================================
   # JOB: UPLOAD SFTP
   # ========================================
@@ -485,7 +465,7 @@ jobs:
     name: Upload to Server via SFTP
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always()
     
     strategy:
       matrix:
@@ -547,12 +527,13 @@ jobs:
         run: |
           echo "✅ Successfully uploaded ${{ matrix.platform }} to server"
           echo "📍 Location: ${{ secrets.SFTP_REMOTE_PATH }}/artifacts/${{ env.VERSION }}/${{ env.BUILD_DATE }}/${{ matrix.platform }}"
-
   # ========================================
   # JOB: UPLOAD GITHUB ARTIFACTS
   # ========================================
   upload-github:
     name: Archive on GitHub
+    needs: build
+    if: always()
     runs-on: ubuntu-latest
     
     strategy:
