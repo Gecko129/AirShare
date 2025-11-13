@@ -553,7 +553,6 @@ jobs:
   # ========================================
   upload-github:
     name: Archive on GitHub
-    needs: build
     runs-on: ubuntu-latest
     
     strategy:
