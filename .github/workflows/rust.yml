@@ -331,7 +331,7 @@ jobs:
           if [[ "$(nproc)" -gt 2 ]]; then
             export UV_THREADPOOL_SIZE=$(nproc)
           fi
-          npm run build
+          npm run build -- --define VITE_BUILD_DATE='"$(date +%Y-%m-%d)"'
       - name: Install frontend dependencies
         if: contains(matrix.os, 'self-hosted') == false
         shell: bash
@@ -350,7 +350,7 @@ jobs:
           if [[ "${{ runner.os }}" == "Linux" ]] && [[ "$(nproc)" -gt 2 ]]; then
             export UV_THREADPOOL_SIZE=$(nproc)
           fi
-          npm run build
+          npm run build -- --define VITE_BUILD_DATE='"$(date +%Y-%m-%d)"'
       # ========================================
       # BUILD TAURI (SUPER OTTIMIZZATO)
       # ========================================
