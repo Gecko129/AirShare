@@ -10,9 +10,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  # Ottimizzazione globale per tutti i runner
   NODE_OPTIONS: "--max-old-space-size=4096"
-  # Cache keys per invalidazione intelligente
   CACHE_VERSION: "v3"
 
 jobs:
@@ -21,30 +19,41 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS - Build universale più efficiente
           - os: macos-latest
             target: aarch64-apple-darwin
             name: "macOS ARM64"
+            platform: "macos-arm64"
             rust-cache-key: "macos-arm64"
+            upload_sftp: true
+            upload_github: false
           - os: macos-latest
             target: x86_64-apple-darwin
             name: "macOS x64"
+            platform: "macos-x64"
             rust-cache-key: "macos-x64"
-          # Windows - Ottimizzato per MSVC
+            upload_sftp: true
+            upload_github: false
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: "Windows x64"
+            platform: "windows-x64"
             rust-cache-key: "windows-x64"
-          # Linux GitHub hosted - Ottimizzato per performance
+            upload_sftp: true
+            upload_github: false
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             name: "Linux x64"
+            platform: "linux-x64"
             rust-cache-key: "linux-x64"
-          # Linux ARM64 self-hosted - Mantenuto ottimizzato
+            upload_sftp: true
+            upload_github: false
           - os: [self-hosted, ARM64, Linux]
             target: aarch64-unknown-linux-gnu
             name: "Linux ARM64"
+            platform: "linux-arm64"
             rust-cache-key: "linux-arm64"
+            upload_sftp: false
+            upload_github: true
     
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
@@ -56,9 +65,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Shallow clone per velocità
           fetch-depth: 1
-          # Ottimizza il checkout
           show-progress: false
 
       # ========================================
@@ -71,7 +78,6 @@ jobs:
           key: ${{ env.CACHE_VERSION }}-${{ matrix.rust-cache-key }}
           cache-on-failure: true
           cache-all-crates: true
-          # Cache aggiuntive per ottimizzazione
           cache-targets: true
           cache-directories: |
             ~/.cargo/bin/
@@ -99,9 +105,8 @@ jobs:
         if: contains(matrix.os, 'self-hosted') == false
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # LTS stabile e veloce
+          node-version: '18'
           cache: 'npm'
-          # Ottimizzazioni per performance
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup Rust (GitHub hosted)
@@ -109,7 +114,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-          # Componenti minimi necessari
           components: rustfmt, clippy
 
       # ========================================
@@ -122,11 +126,9 @@ jobs:
         run: |
           echo "🔍 Quick environment check..."
           
-          # Check sistema
           ARCH=$(uname -m)
           echo "arch=$ARCH" >> $GITHUB_OUTPUT
           
-          # Check Node.js
           NODE_OK=false
           if command -v node >/dev/null 2>&1; then
             NODE_VERSION=$(node --version)
@@ -141,7 +143,6 @@ jobs:
           fi
           echo "node_ok=$NODE_OK" >> $GITHUB_OUTPUT
           
-          # Check Rust
           RUST_OK=false
           if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
             RUST_VERSION=$(rustc --version)
@@ -156,7 +157,6 @@ jobs:
           fi
           echo "rust_ok=$RUST_OK" >> $GITHUB_OUTPUT
           
-          # Check Tauri CLI
           TAURI_OK=false
           if command -v tauri >/dev/null 2>&1; then
             TAURI_VERSION=$(tauri --version 2>/dev/null || echo 'error')
@@ -172,16 +172,13 @@ jobs:
         shell: bash
         run: |
           echo "🚀 Installing Node.js via nvm for Raspberry Pi..."
-          # Installa nvm
           curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.6/install.sh | bash
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-          # Installa Node.js 18 LTS
           nvm install 18
           nvm use 18
 
-          # Verifica installazione
           echo "Node.js version: $(node -v)"
           echo "Node architecture: $(node -p 'process.arch')"
           echo "NPM version: $(npm -v)"
@@ -207,6 +204,31 @@ jobs:
           cargo install tauri-cli --locked
           echo "Tauri CLI ready: $(tauri --version)"
 
+      # Setup SSH key from secrets for secure upload
+      - name: Setup SSH key
+        if: matrix.upload_sftp == true
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # Set version and build date cross-platform
+      - name: Set version and build date (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+
+      - name: Set version and build date (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          Write-Host "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $buildDate = Get-Date -Format "yyyy-MM-dd"
+          Write-Host "BUILD_DATE=$buildDate" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      
       # ========================================
       # DIPENDENZE SISTEMA OTTIMIZZATE
       # ========================================
@@ -232,7 +254,6 @@ jobs:
         if: contains(matrix.os, 'self-hosted')
         shell: bash
         run: |
-          # Check rapido delle dipendenze
           MISSING_DEPS=()
           for dep in libgtk-3-dev libwebkit2gtk-4.1-dev build-essential; do
             if ! dpkg -l | grep -q "^ii  $dep "; then
@@ -260,9 +281,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          # NSIS per installer Windows
           choco install nsis -y --no-progress
-          # WebView2 è già presente nei runner GitHub
 
       # ========================================
       # CONFIGURAZIONI OTTIMIZZATE
@@ -270,17 +289,13 @@ jobs:
       - name: Configure build environment
         shell: bash
         run: |
-          # Configurazioni globali per performance
           if [[ "${{ runner.os }}" == "Linux" ]]; then
-            # Ottimizzazioni Linux
             echo "RUSTFLAGS=-C target-cpu=native -C opt-level=2" >> $GITHUB_ENV
             echo "CARGO_BUILD_JOBS=$(nproc)" >> $GITHUB_ENV
           elif [[ "${{ runner.os }}" == "macOS" ]]; then
-            # Ottimizzazioni macOS
             echo "RUSTFLAGS=-C target-cpu=native" >> $GITHUB_ENV
             echo "CARGO_BUILD_JOBS=$(sysctl -n hw.logicalcpu)" >> $GITHUB_ENV
           elif [[ "${{ runner.os }}" == "Windows" ]]; then
-            # Ottimizzazioni Windows
             echo "RUSTFLAGS=-C target-cpu=native" >> $env:GITHUB_ENV
             echo "CARGO_BUILD_JOBS=$env:NUMBER_OF_PROCESSORS" >> $env:GITHUB_ENV
           fi
@@ -291,7 +306,6 @@ jobs:
           mkdir -p ~/.cargo
           cat > ~/.cargo/config.toml << 'EOF'
           [build]
-          # jobs automatici (Cargo usa tutti i core disponibili)
           
           [net]
           retry = 2
@@ -348,7 +362,6 @@ jobs:
         if: contains(matrix.os, 'self-hosted') == false
         shell: bash
         run: |
-          # Usa npm ci per build riproducibili e veloci
           if [[ -f "package-lock.json" ]]; then
             npm ci --prefer-offline --no-audit --no-fund
           else
@@ -360,7 +373,6 @@ jobs:
         shell: bash
         run: |
           echo "🎨 Building frontend..."
-          # Ottimizzazioni per build frontend
           export NODE_OPTIONS="--max-old-space-size=4096"
           if [[ "${{ runner.os }}" == "Linux" ]] && [[ "$(nproc)" -gt 2 ]]; then
             export UV_THREADPOOL_SIZE=$(nproc)
@@ -375,17 +387,14 @@ jobs:
         run: |
           echo "🚀 Building Tauri app for ${{ matrix.name }}..."
           
-          # Ottimizzazioni specifiche per piattaforma
           if [[ "${{ runner.os }}" == "Linux" ]]; then
             export PKG_CONFIG_ALLOW_CROSS=1
             export CARGO_TARGET_DIR="target"
           elif [[ "${{ runner.os }}" == "Windows" ]]; then
-            # Ottimizzazioni Windows
             export CARGO_TARGET_DIR="target"
             export RUSTFLAGS="$RUSTFLAGS -C link-arg=/INCREMENTAL:NO"
           fi
           
-          # Build command ottimizzato
           if [[ "${{ contains(matrix.os, 'self-hosted') }}" == "true" ]]; then
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -397,10 +406,83 @@ jobs:
           fi
 
       # ========================================
-      # UPLOAD ARTIFACTS (ORGANIZZATO E SENZA STRUTTURA)
+      # PREPARAZIONE ARTIFACTS PER SFTP
+      # ========================================
+      - name: Prepare artifacts for SFTP upload
+        if: matrix.upload_sftp == true
+        shell: bash
+        run: |
+          echo "📦 Preparing artifacts structure for SFTP..."
+          
+          # Crea la struttura: artifacts/{version}/{build_date}/{platform}/
+          UPLOAD_DIR="artifacts/${{ env.VERSION }}/${{ env.BUILD_DATE }}/${{ matrix.platform }}"
+          mkdir -p "$UPLOAD_DIR"
+          
+          # Copia i file in base alla piattaforma
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            echo "Collecting Windows artifacts..."
+            find src-tauri/target -name "*.exe" -type f -exec cp {} "$UPLOAD_DIR/" \; 2>/dev/null || true
+            
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            echo "Collecting macOS artifacts..."
+            find src-tauri/target -name "*.dmg" -type f -exec cp {} "$UPLOAD_DIR/" \; 2>/dev/null || true
+            # Comprimi .app in zip
+            for app in src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app; do
+              if [[ -d "$app" ]]; then
+                APP_NAME=$(basename "$app")
+                (cd "$(dirname "$app")" && zip -r -q "$UPLOAD_DIR/${APP_NAME}.zip" "$APP_NAME")
+              fi
+            done
+            
+          else
+            echo "Collecting Linux artifacts..."
+            find src-tauri/target -name "*.deb" -type f -exec cp {} "$UPLOAD_DIR/" \; 2>/dev/null || true
+            find src-tauri/target -name "*.AppImage" -type f -exec cp {} "$UPLOAD_DIR/" \; 2>/dev/null || true
+          fi
+          
+          # Verifica che ci siano file
+          if [[ -z "$(ls -A "$UPLOAD_DIR")" ]]; then
+            echo "⚠️ Warning: No artifacts found for upload!"
+            exit 0
+          fi
+          
+          # Crea manifest con info build
+          cat > "$UPLOAD_DIR/build-info.json" << EOF
+          {
+            "version": "${{ env.VERSION }}",
+            "build_date": "${{ env.BUILD_DATE }}",
+            "platform": "${{ matrix.platform }}",
+            "target": "${{ matrix.target }}",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "workflow_run": "${{ github.run_number }}"
+          }
+          EOF
+          
+          echo "✅ Artifacts prepared in: $UPLOAD_DIR"
+          ls -lh "$UPLOAD_DIR"
+
+      # ========================================
+      # UPLOAD VIA SFTP
+      # ========================================
+      - name: Upload artifacts to server via SFTP
+        if: matrix.upload_sftp == true
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          username: ${{ secrets.SFTP_USERNAME }}
+          server: ${{ secrets.SFTP_HOST }}
+          port: ${{ secrets.SFTP_PORT || 22 }}
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          local_path: ./artifacts/*
+          remote_path: ${{ secrets.SFTP_REMOTE_PATH }}/artifacts
+          delete_remote_files: false
+          sftp_only: true
+
+      # ========================================
+      # UPLOAD ARTIFACTS GITHUB (ORGANIZZATO E SENZA STRUTTURA)
       # ========================================
       - name: Prepare Windows artifact files
-        if: matrix.os == 'windows-latest'
+        if: matrix.upload_github == true && matrix.os == 'windows-latest'
         shell: bash
         run: |
           mkdir -p artifact_files/windows
@@ -408,7 +490,7 @@ jobs:
           cp src-tauri/target/release/bundle/nsis/*.exe artifact_files/windows/ || true
 
       - name: Upload Windows artifacts
-        if: matrix.os == 'windows-latest'
+        if: matrix.upload_github == true && matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: AirShare-${{ matrix.name }}-Setup
@@ -417,7 +499,7 @@ jobs:
           retention-days: 30
 
       - name: Prepare macOS artifact files
-        if: matrix.os == 'macos-latest'
+        if: matrix.upload_github == true && matrix.os == 'macos-latest'
         shell: bash
         run: |
           mkdir -p artifact_files/macos
@@ -425,7 +507,7 @@ jobs:
           cp -r src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app artifact_files/macos/ || true
 
       - name: Upload macOS artifacts
-        if: matrix.os == 'macos-latest'
+        if: matrix.upload_github == true && matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: AirShare-${{ matrix.name }}
@@ -434,7 +516,7 @@ jobs:
           retention-days: 30
 
       - name: Prepare Linux artifact files
-        if: matrix.os == 'ubuntu-latest' || contains(matrix.os, 'self-hosted')
+        if: matrix.upload_github == true && (matrix.os == 'ubuntu-latest' || contains(matrix.os, 'self-hosted'))
         shell: bash
         run: |
           mkdir -p artifact_files/linux
@@ -444,7 +526,7 @@ jobs:
           cp src-tauri/target/release/bundle/appimage/*.AppImage artifact_files/linux/ || true
 
       - name: Upload Linux artifacts
-        if: matrix.os == 'ubuntu-latest' || contains(matrix.os, 'self-hosted')
+        if: matrix.upload_github == true && (matrix.os == 'ubuntu-latest' || contains(matrix.os, 'self-hosted'))
         uses: actions/upload-artifact@v4
         with:
           name: AirShare-${{ matrix.name }}
@@ -459,15 +541,12 @@ jobs:
         if: always()
         shell: bash
         run: |
-          # Pulisci file temporanei per liberare spazio
           if [[ "${{ runner.os }}" != "Windows" ]]; then
             find . -name "*.tmp" -type f -delete 2>/dev/null || true
             find . -name "*.temp" -type f -delete 2>/dev/null || true
           fi
           
-          # Report dimensioni finali
           if command -v du >/dev/null 2>&1; then
             echo "📊 Final target directory size:"
             du -sh src-tauri/target/ 2>/dev/null || echo "Target directory not found"
           fi
-
