@@ -75,8 +75,11 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
 
-      - name: install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: install jq (only on self-hosted runner)
+        if: runner.environment == 'self-hosted'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
   
       - name: Cache Node.js dependencies
         if: contains(matrix.os, 'self-hosted') == false
