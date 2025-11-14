@@ -1,6 +1,6 @@
 {
   "name": "AirShare",
-  "private": true,
+  "private": false,
   "version": "0.4.0",
   "type": "module",
   "scripts": {
