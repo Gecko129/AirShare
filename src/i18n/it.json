@@ -135,7 +135,7 @@
   "history.delete.description": "Sei sicuro di voler eliminare questo trasferimento? Questa azione non può essere annullata."
   ,
   "devices.available_title": "Dispositivi Disponibili",
-  "devices.selected_count": "{{count}} dispositivo{{count > 1 ? 'i' : ''}} selezionato{{count > 1 ? 'i' : ''}}",
+  "devices.selected_count": "{{count}} dispositivi selezionati",
   "devices.deselect_all": "Deseleziona Tutti",
   "devices.searching": "Ricerca...",
   "devices.refresh": "Aggiorna",

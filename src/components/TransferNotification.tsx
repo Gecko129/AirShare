@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "motion/react";
-import { CheckCircle, Download, Upload, X } from "lucide-react";
+import { Download, Upload, X } from "lucide-react";
 
 interface Notification {
   id: string;
