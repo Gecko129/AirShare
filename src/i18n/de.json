@@ -258,5 +258,8 @@
   "transfer.incoming_subtitle": "Dateien werden empfangen",
   "send_file_with_progress.cancel_tooltip": "Übertragung abbrechen",
   "send_file_with_progress.files_completed": "Dateien abgeschlossen",
-  "send_file_with_progress.in_progress": "In Bearbeitung"
+  "send_file_with_progress.in_progress": "In Bearbeitung",
+  "common.back": "Zurück zu den Einstellungen",
+  "privacy.questions": "Fragen? Kontaktiere uns auf",
+  "terms.questions": "Fragen? Kontaktiere uns auf"
 }

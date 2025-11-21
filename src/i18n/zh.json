@@ -258,5 +258,8 @@
   "transfer.incoming_subtitle": "正在接收的文件",
   "send_file_with_progress.cancel_tooltip": "取消传输",
   "send_file_with_progress.files_completed": "个文件已完成",
-  "send_file_with_progress.in_progress": "进行中"
+  "send_file_with_progress.in_progress": "进行中",
+  "common.back": "返回设置",
+  "privacy.questions": "有问题？请在此联系：",
+  "terms.questions": "有问题？请在此联系："
 }

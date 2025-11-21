@@ -256,5 +256,8 @@
   "transfer.incoming_subtitle": "Files being received",
   "send_file_with_progress.cancel_tooltip": "Cancel transfer",
   "send_file_with_progress.files_completed": "files completed",
-  "send_file_with_progress.in_progress": "In progress"
+  "send_file_with_progress.in_progress": "In progress",
+  "common.back": "Back to Settings",
+  "privacy.questions": "Questions? Contact us on",
+  "terms.questions": "Questions? Contact us on"
 }

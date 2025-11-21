@@ -122,10 +122,19 @@ export default function TermsOfService() {
           className="gap-2"
         >
           <ArrowLeft className="w-4 h-4" />
-          {t('common.back', 'Torna alle Impostazioni')}
+          {t('common.back')}
         </Button>
         <p className="text-xs text-muted-foreground">
-          {t('terms.questions', 'Hai domande? Contattaci su')} <a href="https://github.com/Gecko129/AirShare/issues" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">GitHub</a>
+          {t('terms.questions')} <a
+            href="https://github.com/Gecko129/AirShare/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground transition-colors"
+            onClick={e => {
+              e.preventDefault();
+              window.open('https://github.com/Gecko129/AirShare/issues', '_blank', 'noopener,noreferrer');
+            }}
+          >GitHub</a>
         </p>
       </div>
     </div>

@@ -132,8 +132,7 @@
   "history.hours_ago": "{{count}} ore fa",
   "history.just_now": "Poco fa",
   "history.delete.title": "Conferma eliminazione",
-  "history.delete.description": "Sei sicuro di voler eliminare questo trasferimento? Questa azione non può essere annullata."
-  ,
+  "history.delete.description": "Sei sicuro di voler eliminare questo trasferimento? Questa azione non può essere annullata.",
   "devices.available_title": "Dispositivi Disponibili",
   "devices.selected_count": "{{count}} dispositivi selezionati",
   "devices.deselect_all": "Deseleziona Tutti",
@@ -260,5 +259,8 @@
   "transfer.incoming_subtitle": "File in fase di ricezione",
   "send_file_with_progress.cancel_tooltip": "Annulla invio",
   "send_file_with_progress.files_completed": "file completati",
-  "send_file_with_progress.in_progress": "In corso"
-  }
+  "send_file_with_progress.in_progress": "In corso",
+  "common.back": "Torna alle Impostazioni",
+  "privacy.questions": "Hai domande? Contattaci su",
+  "terms.questions": "Hai domande? Contattaci su"
+}

@@ -51,7 +51,7 @@ interface BackendTransferRecord {
   id: string;
   fileName: string;
   fileSize: number;
-  transferType: 'sent' | 'received';
+  type: 'sent' | 'received'; // <-- was transferType
   status: 'completed' | 'cancelled' | 'failed';
   fromDevice: string;
   toDevice: string;
@@ -79,7 +79,7 @@ export function TransferHistory() {
         id: t.id,
         fileName: t.fileName,
         fileSize: t.fileSize,
-        type: t.transferType,
+        type: t.type, // <-- was t.transferType
         status: t.status,
         fromDevice: t.fromDevice,
         toDevice: t.toDevice,

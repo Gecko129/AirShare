@@ -258,5 +258,8 @@
     "transfer.incoming_subtitle": "Fichiers en cours de réception",
     "send_file_with_progress.cancel_tooltip": "Annuler le transfert",
     "send_file_with_progress.files_completed": "fichiers terminés",
-    "send_file_with_progress.in_progress": "En cours"
+    "send_file_with_progress.in_progress": "En cours",
+    "common.back": "Retour aux paramètres",
+    "privacy.questions": "Des questions ? Contactez-nous sur",
+    "terms.questions": "Des questions ? Contactez-nous sur"
 }
