@@ -28,3 +28,6 @@ out
 public
 target 
 repo-log
+
+# backup della ui
+backup-ui
