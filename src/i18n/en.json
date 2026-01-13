@@ -283,6 +283,6 @@
   "tour.appearance.description": "Customize the look and feel, including Dark Mode.",
   "tour.help.title": "Need Help?",
   "tour.help.description": "Click here to restart this tour anytime.",
-  "tour.exit.confirm": "Are you sure you want to limit the tour?",
+  "tour.exit.confirm": "Are you sure you want to exit the tour?",
   "tour.start": "Start Tour"
 }
