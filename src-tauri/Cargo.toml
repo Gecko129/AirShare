@@ -1,6 +1,6 @@
 [package]
 name = "AirShare"
-version = "0.4.0"
+version = "0.5.0"
 description = "AirShare - Lightning-fast, lossless file transfer over your local network"
 authors = ["Gianlu1107 (Gianluca Morello)", "Gecko129 (Filippo)"]
 license = "AGPL-3.0"
