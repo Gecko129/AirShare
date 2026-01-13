@@ -359,8 +359,10 @@ jobs:
           rm -rf node_modules package-lock.json
           npm cache clean --force
           npm install --build-from-source --prefer-offline --no-audit
-          npm install @tauri-apps/plugin-dialog@2.4.0 @tauri-apps/api@2.4.0 @tauri-apps/cli@2.4.0 --save-exact
+          echo "Installing latest compatible Tauri packages..."
+          npm install @tauri-apps/plugin-dialog@latest @tauri-apps/api@latest @tauri-apps/cli@latest --save-exact
           cd src-tauri
+          echo "Updating Cargo dependencies..."
           cargo clean
           cargo update
           cd ..
