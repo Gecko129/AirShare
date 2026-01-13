@@ -425,6 +425,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
           {stats.map((_, index) => (
             <button
               key={index}
+              aria-label={`Show stat ${index + 1}`}
               onClick={() => setCurrentStatsIndex(index)}
               className={`w-2 h-2 rounded-full transition-colors ${
                 index === currentStatsIndex ? 'bg-primary' : 'bg-muted'
@@ -495,6 +496,7 @@ export function DynamicSidebar({ selectedDevices, networkSpeed, context }: Dynam
           {tips.map((_, index) => (
             <button
               key={index}
+              aria-label={`Show tip ${index + 1}`}
               onClick={() => setCurrentTipIndex(index)}
               className={`w-2 h-2 rounded-full transition-colors ${
                 index === currentTipIndex ? 'bg-primary' : 'bg-muted'

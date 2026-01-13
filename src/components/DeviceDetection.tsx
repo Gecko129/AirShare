@@ -105,7 +105,7 @@ export function DeviceDetection({ onDeviceSelect, selectedDevices }: DeviceDetec
   };
 
   return (
-    <div className="space-y-6">
+    <div id="device-list-container" className="space-y-6">
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}

@@ -1,0 +1,73 @@
+
+/* Driver.js Custom Theme */
+.driverjs-theme {
+    background-color: var(--card) !important;
+    color: var(--card-foreground) !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.2) !important;
+    border: 1px solid var(--border) !important;
+    font-family: inherit !important;
+    max-width: 350px !important;
+}
+
+.driverjs-theme .driver-popover-title {
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem !important;
+    color: var(--primary) !important;
+    font-family: inherit !important;
+}
+
+.driverjs-theme .driver-popover-description {
+    font-size: 0.95rem !important;
+    line-height: 1.5 !important;
+    color: var(--muted-foreground) !important;
+    margin-bottom: 1rem !important;
+    font-family: inherit !important;
+}
+
+.driverjs-theme .driver-popover-footer {
+    display: flex !important;
+    gap: 0.5rem !important;
+    justify-content: flex-end !important;
+    margin-top: 0.5rem !important;
+}
+
+.driverjs-theme .driver-popover-btn {
+    border-radius: 0.5rem !important;
+    padding: 0.4rem 0.8rem !important;
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    text-shadow: none !important;
+    border: none !important;
+    font-family: inherit !important;
+}
+
+.driverjs-theme .driver-popover-prev-btn {
+    background-color: var(--secondary) !important;
+    color: var(--secondary-foreground) !important;
+    border: 1px solid var(--border) !important;
+}
+
+.driverjs-theme .driver-popover-prev-btn:hover {
+    background-color: hsl(var(--secondary) / 0.8) !important;
+}
+
+.driverjs-theme .driver-popover-next-btn {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+}
+
+.driverjs-theme .driver-popover-next-btn:hover {
+    background-color: hsl(var(--primary) / 0.8) !important;
+}
+
+.driverjs-theme .driver-popover-close-btn {
+    color: hsl(var(--muted-foreground)) !important;
+}
+
+.driverjs-theme .driver-popover-progress-text {
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 0.75rem !important;
+}

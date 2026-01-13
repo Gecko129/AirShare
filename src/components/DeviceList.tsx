@@ -174,7 +174,7 @@ export function DeviceList({ selectedDevices, onSelectionChange }: DeviceListPro
   };
 
   return (
-    <Card className="backdrop-blur-md bg-gray-900/40 border border-gray-700/50 shadow-2xl p-6 w-full">
+    <Card id="device-list-container" className="backdrop-blur-md bg-gray-900/40 border border-gray-700/50 shadow-2xl p-6 w-full">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-full bg-gradient-to-r from-gray-700/40 to-slate-600/40 backdrop-blur-sm">
