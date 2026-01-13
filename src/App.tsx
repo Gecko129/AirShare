@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import "./driver.css";
 import {
   Tabs,
   TabsContent,
@@ -13,6 +14,7 @@ import {
   Send,
   History,
   Zap,
+  HelpCircle,
 } from "lucide-react";
 import { DeviceDetection } from "./components/DeviceDetection";
 import { FileTransfer } from "./components/FileTransfer";
@@ -29,6 +31,7 @@ import { AutoAcceptNotification } from './components/AutoAcceptNotification';
 import { TransferNotification } from './components/TransferNotification';
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useTour } from "./hooks/useTour";
 
 interface UploadFile {
   name: string;
@@ -52,9 +55,17 @@ type BackendTransferRecord = {
 
 function AppContent() {
   const { t } = useTranslation();
+  
   const [selectedDevices, setSelectedDevices] = useState<any[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<UploadFile[]>([]);
   const [activeTab, setActiveTab] = useState("transfer");
+  
+  const { startTour, checkAndStartTour } = useTour(setActiveTab);
+
+  useEffect(() => {
+    checkAndStartTour();
+  }, []);
+
   const [avgSpeedToday, setAvgSpeedToday] = useState<number>(0);
   const [route, setRoute] = useState<string>(window.location.hash || "");
 
@@ -146,7 +157,7 @@ function AppContent() {
       </div>
       
       {/* Header */}
-      <header className="border-b backdrop-blur-md bg-background/85 dark:bg-background/70 sticky top-0 z-50 relative">
+      <header id="app-header" className="border-b backdrop-blur-md bg-background/85 dark:bg-background/70 sticky top-0 z-50 relative">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -174,6 +185,14 @@ function AppContent() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 {t('common.online')}
               </Badge>
+              <button
+                id="start-tour-btn"
+                onClick={startTour}
+                className="p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                title={t('tour.start', 'Start Tour')}
+              >
+                <HelpCircle className="w-5 h-5 text-muted-foreground" />
+              </button>
             </div>
           </div>
         </div>
@@ -217,6 +236,7 @@ function AppContent() {
           <div className="relative">
             <TabsList className="flex w-full lg:w-[950px] h-16 bg-background/80 dark:bg-background/60 backdrop-blur-md border border-border/50 p-1 gap-1">
               <TabsTrigger
+                id="tab-transfer"
                 value="transfer"
                 className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
               >
@@ -238,6 +258,7 @@ function AppContent() {
                 </div>
               </TabsTrigger>
               <TabsTrigger
+                id="tab-devices"
                 value="devices"
                 className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
               >
@@ -259,6 +280,7 @@ function AppContent() {
                 </div>
               </TabsTrigger>
               <TabsTrigger
+                id="tab-history"
                 value="history"
                 className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
               >
@@ -280,6 +302,7 @@ function AppContent() {
                 </div>
               </TabsTrigger>
               <TabsTrigger
+                id="tab-settings"
                 value="settings"
                 className="relative overflow-hidden group h-full px-6 py-3 data-[state=active]:bg-transparent flex-1 transition-all duration-300"
               >

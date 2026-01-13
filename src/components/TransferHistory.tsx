@@ -252,7 +252,7 @@ export function TransferHistory() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" id="history-list">
       {/* Header with Stats */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

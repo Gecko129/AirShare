@@ -113,7 +113,7 @@ export function Settings() {
       </div>
 
       {/* Appearance Settings */}
-      <GlassCard className="p-6">
+      <GlassCard className="p-6" id="appearance-settings">
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Palette className="w-4 h-4" />
@@ -155,7 +155,7 @@ export function Settings() {
       </GlassCard>
 
       {/* Language Settings */}
-      <GlassCard className="p-6">
+      <GlassCard className="p-6" id="language-settings">
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4" />

@@ -597,6 +597,7 @@ export function FileTransfer({
 
         {/* File drop area */}
         <div
+          id="file-drop-zone"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
