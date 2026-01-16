@@ -8,7 +8,16 @@ export default function TermsOfService() {
   const { t } = useTranslation();
   
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 relative overflow-hidden">
+      {/* Ambient background orbs */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/4 dark:bg-blue-400/2 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-3/4 right-1/4 w-80 h-80 bg-purple-500/4 dark:bg-purple-400/2 rounded-full blur-3xl animate-pulse delay-1000" />
+      </div>
+      
+      
+      <main className="max-w-6xl mx-auto px-6 py-8 relative z-10">
+        <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -137,6 +146,8 @@ export default function TermsOfService() {
           >GitHub</a>
         </p>
       </div>
+        </div>
+      </main>
     </div>
   );
 }

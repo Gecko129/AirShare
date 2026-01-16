@@ -1,7 +1,13 @@
+#[tauri::command]
+fn get_build_date() -> String {
+  env!("BUILD_DATE").to_string()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_fs::init()) // Aggiungi questa riga
+    .invoke_handler(tauri::generate_handler![get_build_date])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

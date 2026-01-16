@@ -8,6 +8,7 @@ import { Button } from './ui/button';
 import { Separator } from './ui/separator';
 import { useTheme } from './ThemeProvider';
 import { getVersion } from '@tauri-apps/api/app';
+import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { TrustedDevicesManager } from './TrustedDevicesManager';
 
@@ -44,6 +45,7 @@ export function Settings() {
   const [notifications, setNotifications] = useState(true);
   const [autoAccept, setAutoAccept] = useState(false);
   const [appVersion, setAppVersion] = useState<string>('');
+  const [buildDate, setBuildDate] = useState<string>('');
   const [showTrustedDevices, setShowTrustedDevices] = useState(false);
 
   // Sync auto-accept with backend settings
@@ -67,6 +69,9 @@ export function Settings() {
       try {
         const v = await getVersion();
         setAppVersion(v);
+        
+        const date = await invoke<string>('get_build_date');
+        setBuildDate(date);
       } catch (e) {
         // fallback silenzioso
       }
@@ -255,7 +260,7 @@ export function Settings() {
             </div>
             <div className="flex justify-between">
               <span>{t('settings.build')}</span>
-              <span>2024.01.15</span>
+              <span>{buildDate || '-'}</span>
             </div>
           </div>
 
@@ -271,7 +276,9 @@ export function Settings() {
             <Button
               variant="ghost"
               className="w-full justify-start p-0 h-auto"
-              onClick={() => { window.open('https://github.com/Gecko129/AirShare/issues', '_blank'); }}
+              onClick={() => { 
+                window.open('https://github.com/Gecko129/AirShare/issues', '_blank', 'noopener,noreferrer');
+              }}
             >
               {t('settings.support')}
             </Button>

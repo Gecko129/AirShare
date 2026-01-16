@@ -19,8 +19,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
    try {
      const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
      if (stored === 'light' || stored === 'dark') return stored;
-     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-     return prefersDark ? 'dark' : 'light';
+     // Always default to light theme (dark theme is WIP)
+     return 'light';
    } catch {
      return 'light';
    }
